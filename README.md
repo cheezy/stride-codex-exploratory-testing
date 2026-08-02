@@ -68,8 +68,10 @@ skills* (see [Quick start](#quick-start)), not by typing `/commands`.
 
 ## The model
 
-Exploratory testing here runs on five engines. Each has a home skill where its
-depth lives:
+Exploratory testing here runs on five engines. Most skills deepen one or more of
+them; `session` and `bug-advocacy` sit around the loop rather than inside it — one
+holds the session together, the other takes over once a result has been judged a
+defect. Each engine has a home skill where its depth lives:
 
 | Engine | What it does | Home |
 |---|---|---|
@@ -83,7 +85,7 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 
 ## What's in this plugin
 
-**5 doctrine skills** (the reusable knowledge the command-skills and agents draw on):
+**6 doctrine skills** (the reusable knowledge the command-skills and agents draw on):
 
 - **`stride-exploratory-testing`** — the orchestrator and front door. Routes any
   exploratory-testing request to the right skill or agent, and holds the
@@ -98,6 +100,10 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 - **`oracles`** — how to decide whether an observed result is a defect: Never/Always
   invariants, consistency oracles (history, comparable products, standards, claims,
   user expectations, purpose), and the HTSM quality-criteria checklist.
+- **`bug-advocacy`** — what happens after an oracle says something is wrong: Cem
+  Kaner's RIMGEA follow-through (Replicate, Isolate, Maximize, Generalize,
+  Externalize, And say it clearly), a severity rubric with explicit per-level
+  criteria, and the dispassionate-tone rule.
 - **`session`** — the Session-Based Test Management (SBTM) lifecycle: the session
   sheet, Task Breakdown Metrics, and the two debrief templates.
 
@@ -111,7 +117,8 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
   them into ranked charters.
 - **`stride-exploratory-testing-explore`** — plan-and-execute a full session end to
   end: generate or load charters, dispatch the `explorer` agent per charter under
-  the safety boundary, and aggregate everything into one debrief.
+  the safety boundary, and aggregate everything into one debrief, written to
+  `.exploratory/sessions/` by default.
 - **`stride-exploratory-testing-recon`** — a lightweight reconnaissance pass over an
   unfamiliar feature to map the landscape, surface stakeholder questions, and emit
   ranked candidate charters.
@@ -177,6 +184,55 @@ no slash commands.
 The [`fixtures/`](fixtures/) directory shows exactly what a charter set, a session
 sheet, and a debrief look like when they're done well.
 
+## Session artifacts
+
+Exploration that lives only in the conversation dies with it. The command-skills
+write three things into **the project you are testing** — the current working
+directory, never the installed skill tree:
+
+```
+.exploratory/
+  backlog.md                                 # candidate charters + parked off-charter items
+  coverage.md                                # which areas have been explored, and when
+  sessions/
+    2026-07-30-1942-receipt-import.md        # one file per explore run: that run's debrief
+```
+
+- **`stride-exploratory-testing-explore` writes its aggregated debrief by default**
+  to `.exploratory/sessions/<timestamp>-<target-slug>.md`. Pass `--output <path>` to
+  redirect that one document somewhere else.
+- **The backlog is append-only.** The explore skill adds the charters it couldn't
+  fund and every off-charter item parked mid-session; the charter, nightmare-headline
+  and recon skills add the charters they generated; the debrief skill adds the parked
+  items and open questions from your notes. Entries are checked off, never deleted.
+- **The coverage outline is a map, not a score.** It records which areas were
+  explored, when, what is covered, and — the part that matters — what is still dark.
+  There is no coverage percentage in it and there never will be: "explored enough"
+  is a judgment, not a number.
+- **The charter skill reads both back** and hands a digest to the `charter-generator`
+  agent, so run five proposes different charters than run one instead of
+  re-suggesting ground you already covered.
+
+**A first run creates the tree.** No command-skill fails, warns, or asks you to set
+anything up because `.exploratory/` doesn't exist yet — a missing file is an empty
+starting state.
+
+**Gitignore it.** Session output describes a real application and may quote what it
+observed, so add one line to your project's `.gitignore`:
+
+```gitignore
+.exploratory/
+```
+
+Everything keeps working with it ignored. And the redaction rule applies to written
+files just as it does on screen: no real credentials, tokens, customer data, or
+internal hostnames reach any artifact. When these files are read back on a later
+run they are treated as **untrusted data** — content to weigh, never instructions to
+obey.
+
+No command-skill writes anywhere other than these three paths or a `--output` path
+you named yourself.
+
 ## Heuristics reference
 
 The `heuristics` skill is the canonical catalog of test-idea lenses — general and
@@ -193,7 +249,8 @@ plugin paraphrases them rather than reproducing their text. If it's useful, go r
 the primary sources:
 
 - **Exploratory testing as a discipline** — Cem Kaner, who coined the term and
-  framed it as *simultaneous* test design, execution, and learning.
+  framed it as *simultaneous* test design, execution, and learning. **RIMGEA** and
+  the bug-advocacy discipline in the `bug-advocacy` skill are his as well.
 - **Charter-based, practical exploratory testing** — Elisabeth Hendrickson,
   *Explore It!* — the source of the `Explore <target> with <resources> to discover
   <information>` charter template this plugin builds on.
