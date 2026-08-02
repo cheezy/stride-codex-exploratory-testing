@@ -5,7 +5,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-08-02
+
+A capability sweep ported from the Claude Code edition's 0.2.0: two corrections to existing content, a sixth doctrine skill, session artifacts that survive the conversation, and the plugin's first interactive and hardening command-skills.
 
 ### Added
 
