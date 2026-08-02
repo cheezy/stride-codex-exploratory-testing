@@ -217,6 +217,8 @@ Deflation costs the same credibility from the other side — a Critical filed as
 
 ## Handing off
 
+**A third consumer sits downstream of `minimal_repro` specifically: the `stride-exploratory-testing-harden` skill.** An isolated minimal repro is a test case that has not been written down yet — it is the shortest set of conditions that still triggers the failure, which is precisely what a minimal test case is. That skill reads a session's confirmed bugs, detects the project's own test framework, and drafts a regression check per bug from that field, so the bug cannot come back unnoticed. This is why **Isolate** repays its cost twice: once in the report a developer can act on, and again in the check that keeps the fix honest. It is also why `"not established: …"` matters rather than embarrassing — a bug whose repro was never isolated is one that skill will honestly report as not convertible instead of guessing a trigger for it.
+
 The `oracles` skill decides *whether* a result is a defect; this skill decides what that defect looks like by the time anyone reads it, and how bad it is. The finished write-up flows into the session notes and the debrief (the `session` skill), and the `explorer` agent emits it as a `bugs[]` entry — `minimal_repro`, `worst_observed`, `generalization`, `stakeholder_impact`, and `severity` are the four RIMGEA products plus the rating.
 
 Two of the steps feed work back upstream rather than into the report. **Generalize** often reveals a whole class of failure worth its own mission — that goes to `chartering` as a candidate charter. And an **unverified escalation** from Maximize goes to the off-charter parking lot for the same reason: the next session demonstrates it or rules it out, and only then does it touch a severity.

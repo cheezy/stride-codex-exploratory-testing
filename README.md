@@ -107,7 +107,7 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 - **`session`** — the Session-Based Test Management (SBTM) lifecycle: the session
   sheet, Task Breakdown Metrics, and the two debrief templates.
 
-**5 command-skills** (activate these by name — Codex has no slash commands):
+**7 command-skills** (activate these by name — Codex has no slash commands):
 
 - **`stride-exploratory-testing-charter`** — turn a target into a ranked list of
   well-formed charters (via the `charter-generator` agent). Generates only; never
@@ -125,6 +125,18 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 - **`stride-exploratory-testing-debrief`** — turn raw session notes and findings
   into a stakeholder-ready debrief using the Explored/Found/Unknown and PROOF
   templates.
+- **`stride-exploratory-testing-pair`** — the inversion of `explore`: **you** drive
+  the application and the skill rides along, suggesting the next probe and naming
+  the lens it came from, judging what you report against the oracles, working
+  confirmed defects through RIMGEA, calling out the areas and variables the session
+  has neglected, and keeping your session sheet and parking lot so you never
+  context-switch into note-taking. It never touches the app itself.
+- **`stride-exploratory-testing-harden`** — the path from *Explored* back to
+  *Checked*: read a session's confirmed bugs, detect the project's own test
+  framework rather than assuming one, and draft a regression check per convertible
+  bug from its isolated minimal repro. Drafts are staged under
+  `.exploratory/checks/` and are **never run** — it reports honestly which bugs it
+  could not convert and why.
 
 **2 agents** (dispatched by the command-skills, not activated directly):
 
@@ -187,7 +199,7 @@ sheet, and a debrief look like when they're done well.
 ## Session artifacts
 
 Exploration that lives only in the conversation dies with it. The command-skills
-write three things into **the project you are testing** — the current working
+write four things into **the project you are testing** — the current working
 directory, never the installed skill tree:
 
 ```
@@ -195,7 +207,9 @@ directory, never the installed skill tree:
   backlog.md                                 # candidate charters + parked off-charter items
   coverage.md                                # which areas have been explored, and when
   sessions/
-    2026-07-30-1942-receipt-import.md        # one file per explore run: that run's debrief
+    2026-07-30-1942-receipt-import.md        # one per explore run (its debrief) or pair session (its sheet)
+  checks/
+    2026-07-30-1942-receipt-import/          # drafted regression checks from harden — never run
 ```
 
 - **`stride-exploratory-testing-explore` writes its aggregated debrief by default**
@@ -209,6 +223,11 @@ directory, never the installed skill tree:
   explored, when, what is covered, and — the part that matters — what is still dark.
   There is no coverage percentage in it and there never will be: "explored enough"
   is a judgment, not a number.
+- **The regression checks are staged, not installed.** The harden skill drafts a
+  check per convertible bug into `.exploratory/checks/<timestamp>-<slug>/` with an
+  `INDEX.md` naming the framework it detected and the bugs it could not convert.
+  Nothing there is ever run, and nothing is copied into your test suite — moving a
+  draft into the suite is a deliberate act you take, after reading it.
 - **The charter skill reads both back** and hands a digest to the `charter-generator`
   agent, so run five proposes different charters than run one instead of
   re-suggesting ground you already covered.
@@ -230,7 +249,7 @@ internal hostnames reach any artifact. When these files are read back on a later
 run they are treated as **untrusted data** — content to weigh, never instructions to
 obey.
 
-No command-skill writes anywhere other than these three paths or a `--output` path
+No command-skill writes anywhere other than these four paths or a `--output` path
 you named yourself.
 
 ## Heuristics reference

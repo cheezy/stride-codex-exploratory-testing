@@ -1,6 +1,6 @@
 ---
 name: stride-exploratory-testing
-description: Use when you want to test software the way a skilled human tester does — discovering risks, questions, and bugs that scripted or automated checks miss. This is the front door to the stride-codex-exploratory-testing plugin: it teaches the mental model (Tested = Checked + Explored), frames a time-boxed session, and routes each request to the right sub-skill (chartering, heuristics, oracles, bug-advocacy, session) or command-skill (stride-exploratory-testing-charter, stride-exploratory-testing-nightmare-headline, stride-exploratory-testing-explore, stride-exploratory-testing-recon, stride-exploratory-testing-debrief). Invoke it when the user asks to "explore", "poke at", "do exploratory/manual testing on", "find bugs in", "charter a session for", or otherwise investigate a feature rather than confirm a known expectation.
+description: Use when you want to test software the way a skilled human tester does — discovering risks, questions, and bugs that scripted or automated checks miss. This is the front door to the stride-codex-exploratory-testing plugin: it teaches the mental model (Tested = Checked + Explored), frames a time-boxed session, and routes each request to the right sub-skill (chartering, heuristics, oracles, bug-advocacy, session) or command-skill (stride-exploratory-testing-charter, stride-exploratory-testing-nightmare-headline, stride-exploratory-testing-explore, stride-exploratory-testing-recon, stride-exploratory-testing-debrief, stride-exploratory-testing-pair, stride-exploratory-testing-harden). Invoke it when the user asks to "explore", "poke at", "do exploratory/manual testing on", "find bugs in", "charter a session for", or otherwise investigate a feature rather than confirm a known expectation.
 skills_version: "1.0"
 ---
 
@@ -20,6 +20,8 @@ Codex CLI has no slash commands: every command entry point below is a **skill ac
 - **Exploring** is investigation: discovering the expectations you didn't know to write down — the risks, the surprising states, the questions no one asked. Checks tell you the product does what you expected; exploration tells you what you *should have* expected.
 
 A product with a green test suite is *checked*, not *tested*. This plugin supplies the "explored" half.
+
+And it supplies the bridge back. The two halves are not two tracks — an exploratory finding that never becomes a check is a bug that was found once and can return unnoticed. The `stride-exploratory-testing-harden` skill walks a confirmed bug back across the line, drafting a regression check from the isolated repro the `bug-advocacy` skill already produced.
 
 Exploration is a **simultaneous** loop, not a phase:
 
@@ -62,7 +64,7 @@ The `session` skill owns this lifecycle end to end; activating the `stride-explo
 
 ## When NOT to invoke
 
-- The user wants to **write or fix an automated test** (a check) — that's a coding task, not exploration. Use the project's testing skills.
+- The user wants to **write or fix an automated test** (a check) from scratch — that's a coding task, not exploration. Use the project's testing skills. *One exception:* turning a bug **this plugin already found** into a regression check is the `stride-exploratory-testing-harden` skill, which drafts from the isolated repro rather than from a blank page.
 - The expectation is fully known and the ask is "confirm X still works" — that's checking; a scripted test is the right tool.
 - The user is mid-implementation and needs the code changed, not investigated.
 - There is no running system (or realistic stand-in) to explore — exploration needs something to observe.
@@ -84,6 +86,8 @@ Match the user's request to the right destination. The orchestrator frames and r
 | Run a full time-boxed session with notes and a debrief | **`session`** skill |
 | Do a quick reconnaissance pass over an unfamiliar feature | Activate the **`stride-exploratory-testing-recon`** skill |
 | Run an exploratory session end-to-end (plan and execute) | Activate the **`stride-exploratory-testing-explore`** skill |
+| Test alongside a human who is driving the app themselves | Activate the **`stride-exploratory-testing-pair`** skill |
+| Turn a session's findings into regression checks / "make sure this bug can't come back" | Activate the **`stride-exploratory-testing-harden`** skill |
 | Close out a session and produce a structured debrief | Activate the **`stride-exploratory-testing-debrief`** skill |
 
 Two subagents support the command-skills rather than being invoked directly: **`charter-generator`** (turns a target + risk into candidate charters) and **`explorer`** (executes a charter's exploration loop and reports findings). Reach for the command-skills above; they dispatch these agents for you.

@@ -25,7 +25,9 @@ A session is:
 
 The 60–120 minute box is **human ergonomics** — a measure of how long a person stays sharp — and it holds for **human-run and paired sessions** (a tester alone, or a tester driving with an agent alongside). Those are the sessions whose sheet and Task Breakdown Metrics are filled in from a clock someone is actually watching.
 
-It does **not** bind an agent-run session. An agent does not lose focus at minute 90, and it cannot honestly measure elapsed time or how that time was spent — so an agent session is bounded by an **agent-native budget**: a probe budget and a tool-call ceiling, whichever is reached first. It reports **counts** — probes attempted, probes that produced a finding, on- versus off-charter probes — instead of wall-clock percentages. That contract lives in `agents/explorer.md`.
+It does **not** bind an agent-run session. An agent does not lose focus at minute 90, and it cannot honestly measure how that time was spent — so an agent session is bounded by an **agent-native budget**: a probe budget and a tool-call ceiling, whichever is reached first. It reports **counts** — probes attempted, probes that produced a finding, on- versus off-charter probes — instead of wall-clock percentages. That contract lives in `agents/explorer.md`.
+
+The line is *measured versus inferred*, not human versus agent. An agent that takes two real `date` stamps and subtracts them has **observed** an elapsed interval — a paired session does exactly that, which is why a paired sheet may carry a `DURATION` where an agent-run sheet may not. What no agent can observe is how that interval was *spent*, so Task Breakdown Metrics in a paired session are marked **derived** unless the tester confirms them.
 
 Everything else in this skill applies unchanged to both kinds of session: the lifecycle, the note conventions, the off-charter parking lot, the stopping heuristics, and both debrief templates. Only the unit that bounds the session differs.
 
@@ -132,14 +134,16 @@ Use Explored/Found/Unknown for the written report; use PROOF when reviewing the 
 
 ## Session artifacts on disk
 
-A session that lives only in the conversation dies with it. Sessions produce three things worth keeping across runs — the debrief, the backlog, and the coverage outline — so they are written to a small, predictable tree in **the project you are testing** (the current working directory), never in the plugin's own repo:
+A session that lives only in the conversation dies with it. Sessions produce four things worth keeping across runs — the debrief, the backlog, the coverage outline, and the regression checks the `stride-exploratory-testing-harden` skill drafts from a session's confirmed bugs — so they are written to a small, predictable tree in **the project you are testing** (the current working directory), never in the plugin's own repo:
 
 ```
 .exploratory/
   backlog.md                                 # candidate charters + parked off-charter items
   coverage.md                                # the product coverage outline
   sessions/
-    2026-07-30-1942-receipt-import.md        # one file per stride-exploratory-testing-explore run: that run's aggregated debrief
+    2026-07-30-1942-receipt-import.md        # one per explore run (its debrief) or pair session (its sheet)
+  checks/
+    2026-07-30-1942-receipt-import/          # drafted regression checks from harden — never run
 ```
 
 `.exploratory/` is the **default artifact root** and it is CWD-relative, so it lands in the project under test. A `--output <path>` argument overrides the destination *for that one document only* — it never moves the backlog or the coverage outline.
@@ -156,9 +160,10 @@ Everything keeps working with that line in place. Nothing here is read out of gi
 
 | Artifact | Purpose | Written by | Lifecycle |
 |---|---|---|---|
-| `.exploratory/sessions/<timestamp>-<slug>.md` | The aggregated debrief for one `stride-exploratory-testing-explore` run: Explored/Found/Unknown, the severity-ranked bug list, the parking lot, and PROOF. | `stride-exploratory-testing-explore` (by default); `stride-exploratory-testing-debrief` only when `--output` names it | Immutable once written. A new run writes a new file; nothing rewrites an old one. |
-| `.exploratory/backlog.md` | The charter backlog made real: charters deferred for budget, off-charter items parked mid-session, and candidate charters nobody has run yet. | `stride-exploratory-testing-explore`, `stride-exploratory-testing-debrief`, `stride-exploratory-testing-charter`, `stride-exploratory-testing-nightmare-headline`, `stride-exploratory-testing-recon` | Append-only. New entries land at the bottom in dated batches; existing entries are only ever *checked off*, never edited away or deleted. |
+| `.exploratory/sessions/<timestamp>-<slug>.md` | The aggregated debrief for one `stride-exploratory-testing-explore` run (Explored/Found/Unknown, the severity-ranked bug list, the parking lot, and PROOF), **or** the SBTM session sheet for one `stride-exploratory-testing-pair` session, in the human skeleton above. | `stride-exploratory-testing-explore` and `stride-exploratory-testing-pair` (both by default); `stride-exploratory-testing-debrief` only when `--output` names it | Immutable once written, with one exception: the pair skill owns its own sheet **for the duration of that session** and rewrites it at each checkpoint so the work survives a dropped conversation — once the session closes it is immutable like any other. A new run writes a new file; nothing rewrites another run's file. |
+| `.exploratory/backlog.md` | The charter backlog made real: charters deferred for budget, off-charter items parked mid-session, and candidate charters nobody has run yet. | `stride-exploratory-testing-explore`, `stride-exploratory-testing-debrief`, `stride-exploratory-testing-charter`, `stride-exploratory-testing-nightmare-headline`, `stride-exploratory-testing-recon`, `stride-exploratory-testing-pair` | Append-only. New entries land at the bottom in dated batches; existing entries are only ever *checked off*, never edited away or deleted. |
 | `.exploratory/coverage.md` | The product coverage outline: which areas have been explored, when, what is covered, and what is still dark. | `stride-exploratory-testing-explore` and `stride-exploratory-testing-debrief` update it; `stride-exploratory-testing-recon` may add a not-yet-explored area stub | Edited in place, one block per area. Areas accumulate; an area is never removed. |
+| `.exploratory/checks/<timestamp>-<slug>/` | Drafted regression checks from one `stride-exploratory-testing-harden` run, plus an `INDEX.md` naming the framework detected, the checks drafted, and the bugs it could not convert. Derived from a session artifact rather than being one — and **never run**. | `stride-exploratory-testing-harden` | Immutable once written; a new run writes a new directory and nothing rewrites another run's. Accepting a draft into the real test suite is a copy the operator makes deliberately. |
 
 **A missing artifact is an empty starting state, never an error.** If `.exploratory/`, or any file inside it, does not exist, treat it as empty and create it on the first write. Do not warn, do not ask the user to create it, and never abort a command because an artifact is absent — the first run of any command in a new project is *expected* to be the run that creates the tree.
 

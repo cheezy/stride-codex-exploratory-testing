@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Asserts the plugin ships every file the Codex CLI edition requires: a
-    valid manifest with the four Codex keys, all five command-skills, all
+    valid manifest with the four Codex keys, all seven command-skills, all
     six doctrine skills, both agents, the three README-referenced fixtures,
     and the root docs (including AGENTS.md and both installers). Codex ships
     NO command files, so there is no commands/ check. JSON is parsed with
@@ -88,7 +88,9 @@ $CommandSkills = @(
     'stride-exploratory-testing-nightmare-headline',
     'stride-exploratory-testing-explore',
     'stride-exploratory-testing-recon',
-    'stride-exploratory-testing-debrief'
+    'stride-exploratory-testing-debrief',
+    'stride-exploratory-testing-pair',
+    'stride-exploratory-testing-harden'
 )
 foreach ($skill in $CommandSkills) {
     $p = Join-Path $PluginRoot ("skills/{0}/SKILL.md" -f $skill)
@@ -106,11 +108,11 @@ foreach ($skill in $DoctrineSkills) {
 }
 
 # Count only real SKILL.md files at the Codex layout depth (skills/<name>/SKILL.md):
-# 5 command-skills + 6 doctrine skills = 11. Fixed depth (not -Recurse) so this twin
+# 7 command-skills + 6 doctrine skills = 13. Fixed depth (not -Recurse) so this twin
 # matches the bash `skills/*/SKILL.md` glob and ignores the .gitkeep placeholder.
 $skillCount = @(Get-ChildItem -Path (Join-Path $PluginRoot 'skills/*/SKILL.md') -File -ErrorAction SilentlyContinue).Count
-if ($skillCount -eq 11) { Test-Ok "exactly 11 SKILL.md files present (.gitkeep ignored)" }
-else { Test-Nope ("expected 11 SKILL.md files, found {0}" -f $skillCount) }
+if ($skillCount -eq 13) { Test-Ok "exactly 13 SKILL.md files present (.gitkeep ignored)" }
+else { Test-Nope ("expected 13 SKILL.md files, found {0}" -f $skillCount) }
 
 # --- Agents (Codex: bare *.md files, no commands/ directory) -----------------
 
