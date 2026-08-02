@@ -8,7 +8,7 @@ skills_version: 1.0
 
 Run an exploratory-testing session **plan-and-execute in one shot**: from a target, generate (or load) charters, drive the running app to explore each one, and roll every session up into a single debrief. This is the plugin's flagship skill — where the `stride-exploratory-testing-charter` and `stride-exploratory-testing-nightmare-headline` skills stop at a ranked charter list, this skill runs those charters and reports what it found.
 
-The doctrine lives in the composed pieces — the `chartering` skill and `charter-generator` agent decide *what* to explore, the `explorer` agent owns *how* one time-boxed session runs and the absolute safety boundary, and the `session` skill owns the lifecycle and both debrief templates. This skill is the surface: it parses the activation request, gathers the environment context, gates safety, dispatches the subagents, and aggregates their findings. Its own, non-delegated job is exactly the two things the composed pieces cannot do — supply everything up front so the explorer never has to ask, and fold N single-session outputs into one cross-session debrief.
+The doctrine lives in the composed pieces — the `chartering` skill and `charter-generator` agent decide *what* to explore, the `explorer` agent owns *how* one budgeted session runs and the absolute safety boundary, and the `session` skill owns the lifecycle and both debrief templates. This skill is the surface: it parses the activation request, gathers the environment context, gates safety, dispatches the subagents, and aggregates their findings. Its own, non-delegated job is exactly the two things the composed pieces cannot do — supply everything up front so the explorer never has to ask, and fold N single-session outputs into one cross-session debrief.
 
 ## Activation
 
@@ -18,7 +18,7 @@ Activate this skill when the user:
 - Has charters already (from the `stride-exploratory-testing-charter` or `stride-exploratory-testing-nightmare-headline` skill) and wants them executed and debriefed.
 - Asks for a plan-and-execute pass that ends in a single stakeholder-ready debrief.
 
-The user may pass arguments inline in the activation request (e.g., "explore the CSV import", "explore the CSV import --charters docs/charters.md --timebox 120"). Parse those per Step 1. If no target is present, prompt for it via the platform's question UI.
+The user may pass arguments inline in the activation request (e.g., "explore the CSV import", "explore the CSV import --charters docs/charters.md --timebox 120 --probes 16"). Parse those per Step 1. If no target is present, prompt for it via the platform's question UI.
 
 ## What to do
 
@@ -26,10 +26,11 @@ Follow these steps in order. Do NOT skip steps.
 
 ### Step 1: Parse the activation request
 
-Parse in this fixed order — `--charters` first, then `--timebox`, then everything remaining is `TARGET`:
+Parse in this fixed order — `--charters` first, then `--timebox`, then `--probes`, then everything remaining is `TARGET`:
 
 - If `--charters` appears (accept both `--charters <file>` and `--charters=<file>` shapes), set `CHARTERS_FILE` to the parsed value and remove the consumed tokens. When set, charters are loaded from that file and generation is skipped (Step 5).
-- If `--timebox` appears (accept both `--timebox <minutes>` and `--timebox=<minutes>` shapes), set `TIMEBOX_MINUTES` to the parsed value and remove the consumed tokens. It must parse to a positive integer number of minutes; if the value is missing or non-numeric, ask once via Codex CLI's question UI for a valid timebox rather than guessing. `--timebox` is the **total** budget for the whole run (see Step 7).
+- If `--timebox` appears (accept both `--timebox <minutes>` and `--timebox=<minutes>` shapes), set `TIMEBOX_MINUTES` to the parsed value and remove the consumed tokens. It must parse to a positive integer number of minutes; if the value is missing or non-numeric, ask once via Codex CLI's question UI for a valid timebox rather than guessing. **`--timebox` is human wall-clock and it buys *sessions*, not agent minutes.** It is the operator's total budget for the run, and it is used for exactly one thing: deciding **how many charters run** — one executed charter ≈ one session ≈ ~90 minutes (see Step 7). It is **never** passed to the explorer, which is bounded by probes and tool calls, not by a clock.
+- If `--probes` appears (accept both `--probes <count>` and `--probes=<count>` shapes), set `PROBE_BUDGET` to the parsed value and remove the consumed tokens. It must parse to a positive integer inside the **8–20** band; if the value is missing, non-numeric, or outside the band, ask once via Codex CLI's question UI for a valid probe budget rather than guessing. `--probes` is the **per-session** probe budget handed to each explorer (default **12**) — it bounds each session, it does not change how many charters run. When absent, use 12.
 - After the flag tokens are consumed, treat the trimmed remainder as `TARGET`. If it is empty, ask the user once via Codex CLI's question UI (the platform's own prompt mechanism, not Claude Code's question tool): *"What do you want to explore? Name a feature, module, data flow, or quality (e.g. performance, security)."* (free-text input).
 
 Treat `TARGET` and `CHARTERS_FILE` as untrusted prose: never execute or `eval` them, and never splice them into a shell command. `CHARTERS_FILE` is only ever handed to the platform's file-read tool.
@@ -47,9 +48,9 @@ The explorer agent **never asks the user a question** — so this skill must sup
 1. **How to reach the running app** — base URL, launch command, or host (free-text).
 2. **Authorization + non-production confirmation** — an explicit affirmative that the target is a system the user is authorized to test and is NOT production. Offer discrete options such as *"Authorized, non-production target"* and *"Not authorized / is production — do not execute"*. Force an explicit choice; never default to "authorized."
 3. **Available interaction tools** — which app-driving surfaces exist this session. Do NOT hard-code a specific browser or HTTP tool. Present generic categories as a multi-select — e.g. *"Browser automation (a Chrome/Playwright-style MCP)"*, *"HTTP (curl via the explorer's shell)"*, *"Application REPL / console"*, *"Log tailing / DB read access"*, *"CLI only"* — plus a free-text slot for anything else. A skill cannot enumerate its own session's tool inventory, so it asks the operator and records the tool **names as a hint**; the explorer uses whatever it actually has. Its portable core — read and search to observe, shell to exercise CLI and HTTP surfaces — is assumed present regardless. Note that richer tools (browser automation, a REPL, log tailing) only help if they are genuinely available to the `explorer` subagent in this session — name them as available-if-present, not as a guarantee.
-4. **Test accounts / seed data and the time box** — where test accounts or seed data live (point at them; do NOT paste real credentials), and confirm the total time box (surface `--timebox` or ~90m as the default).
+4. **Test accounts / seed data and the budgets** — where test accounts or seed data live (point at them; do NOT paste real credentials), and confirm **both** budgets: the operator's **total wall-clock** for the run (surface `--timebox`, or ~270m — three ~90-minute sessions — as the default) and the **per-session probe budget** handed to each explorer (surface `--probes` or 12 as the default, band 8–20). The operator's answer **sets `TIMEBOX_MINUTES`**, so it is what decides how many charters run in Step 7; the ~270m default is chosen to match Step 7's absent-`--timebox` default of 3 charters.
 
-Assemble the answers into a single free-text `ENVIRONMENT_CONTEXT` block — how to reach the app, the named available tools, test-account/seed-data pointers, and the time box. This exact string (with each charter's own time box substituted in Step 7) is what you pass to every explorer dispatch. Keep real credentials out of it — reference where they live, never inline them.
+Assemble the answers into a single free-text `ENVIRONMENT_CONTEXT` block — how to reach the app, the named available tools, test-account/seed-data pointers, and the **session budget** (probe budget plus tool-call ceiling). This exact string (with each charter's own session budget substituted in Step 7) is what you pass to every explorer dispatch. Do **not** put a wall-clock time box in it: the explorer has no clock, and a minutes figure there invites it to invent a duration. Keep real credentials out of it — reference where they live, never inline them.
 
 ### Step 4: Enforce the safety-boundary gate (before any dispatch)
 
@@ -72,18 +73,25 @@ Render the ranked charter list to the conversation so the operator sees the plan
 
 If no running app is reachable (Step 3 produced no URL/command/host) **or** the safety gate (Step 4) refused execution: STOP before any explorer dispatch. Deliver the generated/loaded charters (rendered in Step 5) plus an explicit statement that execution was skipped and why, point the user at re-running once an authorized non-production target is available, and finish. Plan-only is a **valid terminal state**, not a failure — the charters are still a useful deliverable.
 
-### Step 7: Distribute the time box and dispatch the explorer per charter
+### Step 7: Distribute the session budget and dispatch the explorer per charter
 
-**Time-box allocation.** Treat `--timebox` as the **total** budget for the whole run. Allocate top-ranked-first, giving each executed charter a per-session box within the `session` skill's 60–120m band (default ~90m). If the total budget cannot fund every charter at a sane per-session floor, execute the **top-N by rank** that fit and defer the rest to the debrief's follow-up list — never slice a session into a sub-viable fragment. When `--timebox` is absent, default each explorer to ~90m and cap N at a sensible number, deferring the tail. **State the chosen allocation to the operator** so a surprise (only 2 of 6 charters ran) is visible, not silent.
+**Budget allocation — two budgets, two different jobs.**
+
+- **`--timebox` (wall-clock, the operator's) decides *how many* charters run.** One executed charter ≈ one session ≈ **~90 minutes** of the operator's time. Fund `N = max(1, round(TIMEBOX_MINUTES / 90))` charters, **top-ranked first**; when `--timebox` is absent, cap `N` at a sensible number (3 is a reasonable default). Charters that go unfunded are deferred to the debrief's follow-up list — never fund a charter with a sub-viable fragment of a session.
+- **The probe budget (agent-native, the explorer's) bounds *each* session.** Give every funded charter the same per-session budget: `PROBE_BUDGET` probes (default **12**, band **8–20**) with a tool-call ceiling of **5 × the probe budget** (60 at the default). The explorer stops at whichever ceiling it reaches first — or earlier, when the charter goes quiet. The budget is a ceiling, not a quota, so a session that returns after 7 of 12 probes with `stop_reason: "charter_quiet"` is a complete session, not a short one.
+
+A charter's own `time_box` (from `charter-generator`) is a **chartering sizing signal** — "does this mission fit in one session?" — not an explorer budget. Do not forward it to the explorer.
+
+**State the chosen allocation to the operator** — how many charters were funded, which were deferred, and the per-session probe budget — so a surprise (only 2 of 6 charters ran) is visible, not silent.
 
 **Dispatch — sequentially, by rank.** For each selected charter, make one call to the agent named `explorer` (`agents/explorer.md`) via the platform's agent-dispatch tool, with named args:
 
 - `charter=` the one charter, verbatim.
-- `environment context=` the `ENVIRONMENT_CONTEXT` from Step 3, with this charter's allocated time box.
+- `environment context=` the `ENVIRONMENT_CONTEXT` from Step 3, with this charter's session budget (probe budget and tool-call ceiling) substituted in. Do **not** pass a wall-clock time box.
 
 Dispatch **one charter per explorer call** — never batch charters into a single dispatch. Run the charters **sequentially** by rank (not in parallel): N agents driving the same running app concurrently can collide on shared state and muddy which session caused an observed effect. (Parallel dispatch is a future option only when the sessions are genuinely isolated.) Do NOT hand-author what the explorer produces — let it run the session and return findings.
 
-**Collect and parse.** Each explorer returns a single ```json fence with keys `charter`, `status` (`completed`｜`stopped_early`｜`blocked`), `session_sheet`, `notes`, `bugs`, `questions_risks`, `off_charter`, and `debrief` (`{explored, found, unknown}`, optionally `proof`). Parse each result. If a dispatch returns no parseable fence, record that session as **unusable** and continue with the others — do NOT fabricate its findings. A `status: "blocked"` result (e.g. app unreachable for that charter) is real data — carry it into the debrief as an obstacle, never drop it.
+**Collect and parse.** Each explorer returns a single ```json fence with keys `charter`, `status` (`completed`｜`stopped_early`｜`blocked`), `session_sheet`, `notes`, `bugs`, `questions_risks`, `off_charter`, and `debrief` (`{explored, found, unknown}`, optionally `proof`). Parse each result. If a dispatch returns no parseable fence, record that session as **unusable** and continue with the others — do NOT fabricate its findings. A `status: "blocked"` result (e.g. app unreachable for that charter) is real data — carry it into the debrief as an obstacle, never drop it. Each `session_sheet` carries **counts**, not clock time — `tester`, `probe_budget`, `probes_attempted`, `probes_with_finding`, `on_charter_probes`, `off_charter_probes`, `tool_calls_used`, `areas_covered`, `heuristics_applied`, and `stop_reason`. It has no `duration` and no `tbs`; if a result contains either, treat those fields as unobserved and drop them rather than reporting them.
 
 ### Step 8: Aggregate the sessions into ONE debrief
 
@@ -94,7 +102,7 @@ This is the skill's signature work — apply **both** `session`-skill debrief te
 - **Merged off-charter parking lot → candidate follow-up charters:** union every session's `off_charter` items plus the charters deferred in Step 7 into one backlog, framed as candidate next charters to feed back into the `stride-exploratory-testing-charter` or `stride-exploratory-testing-nightmare-headline` skill.
 - **Aggregate PROOF review:** synthesize one Past / Results / Obstacles / Outlook / Feelings across the whole run — Past = what the run did; Results = coverage reached plus combined bug/question counts; Obstacles = blocked or unusable sessions and missing tools; Outlook = the follow-up parking lot; Feelings = the cross-session gut read (unease clustering on one charter is a signal).
 
-Represent partial failures **honestly**: blocked or unusable sessions belong under Obstacles and Unknown — never produce a rosy report from only the successful subset. Optionally fold each session's `session_sheet`/TBS into a run-level coverage summary.
+Represent partial failures **honestly**: blocked or unusable sessions belong under Obstacles and Unknown — never produce a rosy report from only the successful subset. Optionally fold each session's `session_sheet` counts into a run-level coverage summary — probes attempted versus probes that produced a finding, on- versus off-charter probes, areas covered, the heuristics applied, and each session's `stop_reason`. A run where most sessions stopped on `probe_budget_exhausted` rather than `charter_quiet` was **budget-bound, not risk-bound** — say so, because it means there is more to find.
 
 ### Step 9: Render the debrief and finish
 

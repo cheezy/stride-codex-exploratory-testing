@@ -74,7 +74,7 @@ depth lives:
 | Engine | What it does | Home |
 |---|---|---|
 | **Charters** | Give a session its mission: what to explore, with what resources, to discover what information. | `chartering` skill; the `stride-exploratory-testing-charter` and `stride-exploratory-testing-nightmare-headline` skills |
-| **Heuristics** | Idea generators — cheat sheets, Tours, and SFDPOT — for when you're stuck. | `heuristics` skill (SFDPOT lives in `chartering`) |
+| **Heuristics** | Idea generators — cheat sheets, Tours, and SFDIPOT — for when you're stuck. | `heuristics` skill (SFDIPOT lives in `chartering`) |
 | **Variables** | The factors you can deliberately vary (data, state, sequence, environment). | `heuristics` skill (variable catalog) |
 | **Oracles** | How you decide something is actually *wrong*. | `oracles` skill |
 | **Observation** | Noticing what the system actually did — not what you expected. | `session` skill; the `explorer` agent |
@@ -90,7 +90,7 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
   "Tested = Checked + Explored" doctrine.
 - **`chartering`** — how to frame a mission and write a well-formed charter
   (`Explore <target> with <resources> to discover <information>`), rank candidates
-  with SFDPOT and the Nightmare Headline Game, and reframe a "charter" that's really
+  with SFDIPOT and the Nightmare Headline Game, and reframe a "charter" that's really
   a test case.
 - **`heuristics`** — the plugin's single source of truth for concrete test-idea
   lenses: general and web cheat sheets, a variable-spotting catalog, and Whittaker's
@@ -122,9 +122,9 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 **2 agents** (dispatched by the command-skills, not activated directly):
 
 - **`charter-generator`** — turns a target (plus optional risk context) into a
-  ranked list of charters via an SFDPOT sweep, charter-source mining, and the
+  ranked list of charters via an SFDIPOT sweep, charter-source mining, and the
   Nightmare Headline Game. Read-only; generates only, never executes.
-- **`explorer`** — runs a single time-boxed session against ONE charter: designs
+- **`explorer`** — runs a single budgeted session against ONE charter: designs
   probes with `heuristics`, judges results with `oracles`, records an SBTM session
   sheet, and returns structured findings — all under the absolute safety boundary.
 
@@ -154,8 +154,13 @@ no slash commands.
    worst-case headlines drive the charters.
 
 2. **Explore.** Activate the **`stride-exploratory-testing-explore`** skill and hand
-   it a charter for a full, time-boxed session — for example, *"explore the CSV
-   receipt import with a 90-minute time box."*
+   it a charter for a full session — for example, *"explore the CSV receipt import
+   with a 90-minute time box."*
+
+   That time box is **your** clock: it decides how many charters get funded (one
+   session ≈ 90 minutes). Each explorer session itself is bounded by an
+   agent-native **probe budget** — 12 probes by default, `--probes` to change —
+   because an agent has no honest way to measure minutes.
 
    The `explorer` agent probes the feature using the `heuristics` lenses, judges each
    result with the `oracles`, and keeps a running SBTM session sheet — staying inside
@@ -198,7 +203,7 @@ the primary sources:
   Jonathan Bach.
 - **Tours** (Business / Historical / Tourist / Entertainment / Hotel / Seedy
   districts) — James Whittaker, *Exploratory Software Testing*.
-- **The Heuristic Test Strategy Model (HTSM)** — James Bach — including the SFDPOT
+- **The Heuristic Test Strategy Model (HTSM)** — James Bach — including the SFDIPOT
   coverage lens and the quality-criteria checklist the `oracles` skill uses.
 
 ## Changelog

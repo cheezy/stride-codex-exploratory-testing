@@ -6,7 +6,7 @@ skills_version: 1.0
 
 # stride-exploratory-testing-charter
 
-Turn a **target** into a ranked list of exploratory-testing **charters** — missions of the form *"Explore `<target>` with `<resources>` to discover `<information>`"*, ordered highest-risk-first. The doctrine — the charter template, what makes a charter good, the charter sources, the Nightmare Headline Game, and SFDPOT — lives in the `chartering` skill (`skills/chartering/SKILL.md`); the generation procedure and JSON output contract live in the `charter-generator` agent (`agents/charter-generator.md`). This skill is the surface: it parses the activation request, dispatches the agent, renders the returned charters, and optionally writes them to a file.
+Turn a **target** into a ranked list of exploratory-testing **charters** — missions of the form *"Explore `<target>` with `<resources>` to discover `<information>`"*, ordered highest-risk-first. The doctrine — the charter template, what makes a charter good, the charter sources, the Nightmare Headline Game, and SFDIPOT — lives in the `chartering` skill (`skills/chartering/SKILL.md`); the generation procedure and JSON output contract live in the `charter-generator` agent (`agents/charter-generator.md`). This skill is the surface: it parses the activation request, dispatches the agent, renders the returned charters, and optionally writes them to a file.
 
 This skill **generates** charters. It does not run a session or execute a charter — that is the `stride-exploratory-testing-explore` skill.
 

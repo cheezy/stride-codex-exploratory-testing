@@ -42,14 +42,14 @@ you do not activate them directly:
 - **charter-generator** — Turn a target or risk into a ranked list of well-formed
   exploratory-testing charters. Generates charters only; never runs a session.
   Read-only (`read`, `search`, `glob`).
-- **explorer** — Run a single time-boxed session against ONE charter and return
+- **explorer** — Run a single budgeted session against ONE charter and return
   structured findings, under the absolute safety boundary below. Exercises the app
   via `read`, `search`, `glob`, and `shell`.
 
 ## Workflow Sequence
 
 ```
-charter a target → for each charter: run a time-boxed exploratory session → debrief
+charter a target → for each charter: run a budgeted exploratory session → debrief
 ```
 
 Chartering decides WHAT to explore; the explorer agent takes one charter from

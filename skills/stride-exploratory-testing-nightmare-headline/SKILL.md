@@ -16,7 +16,7 @@ Activate this skill when the user:
 
 - Wants to brainstorm the worst-case, most-embarrassing failures of a feature before testing it.
 - Asks to run the "nightmare headline" game, or to seed high-value charters from a feature's failure modes.
-- Has a feature or change and wants risk-driven charters rather than a broad SFDPOT sweep.
+- Has a feature or change and wants risk-driven charters rather than a broad SFDIPOT sweep.
 
 The user may pass arguments inline in the activation request (e.g., "nightmare-headline the password reset flow" or "nightmare-headline the export --output docs/charters.md"). Parse those per Step 1. If no target is present, prompt for it via the platform's question UI.
 

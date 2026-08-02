@@ -38,11 +38,11 @@ Every exploratory session runs on five engines. Each sub-skill deepens one or mo
 | **Observation** | Noticing what the system actually did — not what you expected. Fed by oracles. | `oracles` skill |
 | **Variables** | The factors you can deliberately vary — data, state, sequence, timing, environment, configuration. | `heuristics` skill (variable catalog) |
 | **Oracles** | How you decide something is *wrong* — consistency heuristics, references, claims, user expectations. | `oracles` skill |
-| **Heuristics** | Idea generators that get you unstuck — cheat sheets, Tours, SFDPOT, and other lenses. | `heuristics` skill (SFDPOT lives in `chartering`) |
+| **Heuristics** | Idea generators that get you unstuck — cheat sheets, Tours, SFDIPOT, and other lenses. | `heuristics` skill (SFDIPOT lives in `chartering`) |
 
 ## The session lifecycle (time-boxed)
 
-Exploration is managed as **time-boxed sessions** (Session-Based Test Management, ~60–120 min of uninterrupted, chartered, reviewable work). One session runs:
+Exploration is managed as **time-boxed sessions** (Session-Based Test Management, ~60–120 min of uninterrupted, chartered, reviewable work — that is the **human** box; an agent-run session is bounded by a probe budget instead, see the `session` skill). One session runs:
 
 1. **Charter** — state the mission before touching the system.
 2. **Recon** — a quick pass to learn the landscape and refine the charter.
@@ -74,7 +74,7 @@ Match the user's request to the right destination. The orchestrator frames and r
 | The user wants to… | Route to |
 |---|---|
 | Frame a mission / decide *what* to test / write a charter | **`chartering`** skill |
-| Enumerate targets systematically / apply SFDPOT | **`chartering`** skill (SFDPOT lens) |
+| Enumerate targets systematically / apply SFDIPOT | **`chartering`** skill (SFDIPOT lens) |
 | Generate a risk-driven charter from "what's the worst that could happen" | Activate the **`stride-exploratory-testing-nightmare-headline`** skill |
 | Create one or more charters interactively | Activate the **`stride-exploratory-testing-charter`** skill |
 | Get unstuck / generate test ideas / apply a cheat sheet or a Tour | **`heuristics`** skill |
@@ -95,7 +95,7 @@ The richer models the sub-skills provide are **lenses, not laws** — reach for 
 
 - **SBTM** (Session-Based Test Management) — the charter → session → debrief management frame used above.
 - **Tours** — themed walkthroughs (the money tour, the landmark tour, the back-alley tour…) that bias exploration toward a particular kind of risk. Cataloged in `heuristics`.
-- **SFDPOT** (Structure, Function, Data, Platform, Operations, Time) — a coverage heuristic for making sure you looked at the whole product. Cataloged in `chartering`.
+- **SFDIPOT** (Structure, Function, Data, Interfaces, Platform, Operations, Time) — a coverage heuristic for making sure you looked at the whole product. Cataloged in `chartering`.
 
 Use them as idea generators feeding the design/execute/learn/steer loop — never as a script to march through.
 
