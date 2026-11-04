@@ -5,9 +5,10 @@
 # valid manifest with the four Codex keys, all seven command-skills, all
 # six doctrine skills, both agents, the four README-referenced fixtures,
 # and the root docs (including AGENTS.md and both installers). Codex ships
-# NO command files, so there is no commands/ check. The last two sections
-# pin what the explorer card in agents/explorer.md says and check the
-# explorer's output contract against its fixture. Pure shell + python3
+# NO command files, so there is no commands/ check. The last three
+# sections pin what the explorer card in agents/explorer.md says, check the
+# explorer's output contract against its fixture, and pin what the explorer
+# may observe (curl -q -sS -i, no -L, no fetch tool, no_observation_surface). Pure shell + python3
 # (for JSON) — no network, no jq.
 #
 # Exit code: 0 if every check passes; 1 if any check fails.
@@ -404,7 +405,7 @@ say(set(derive.values()) == set(status_enum) and len(status_enum) == 3,
     "every status value is derived by the table (stopped_early is defined)",
     "derived=%s enum=%s" % (sorted(set(derive.values())), status_enum))
 EXPECTED = {"charter_quiet": "completed", "risk_acceptable": "completed", "probe_budget_exhausted": "stopped_early",
-            "tool_call_ceiling": "stopped_early", "blocked": "blocked"}
+            "tool_call_ceiling": "stopped_early", "blocked": "blocked", "no_observation_surface": "blocked"}
 say(derive == EXPECTED, "the status table maps each stop_reason exactly as contract 1.0 defines", "table=%s" % derive)
 # The mapping check must catch a stop_reason left without a row: drop one row in memory and re-check.
 dropped = re.findall(DERIVE_ROW, re.sub(r"^\| `tool_call_ceiling` \|.*\n", "", derive_text, flags=re.M), re.M)
@@ -560,11 +561,16 @@ def once_seen(d):
     d["bugs"][0]["replicated"] = "1/5"
 def not_established(d):
     d["bugs"][0]["replicated"] = "not established: the budget ran out before a re-run"
+def unobservable_part(d):
+    d["status"] = "blocked"
+    d["session_sheet"]["stop_reason"] = "no_observation_surface"
+    d["questions_risks"].append({"kind": "risk", "text": "focus order of the settings dialog: no browser tool"})
 
 for label, fn in (("zero bugs", zero_bugs), ("no bugs and an empty known_bad array", empty_arrays),
                   ("blocked before the first probe", blocked_first),
                   ("replicated 2/3", two_of_three), ("a once-seen Critical (1/5)", once_seen),
-                  ("replicated not established with a reason", not_established)):
+                  ("replicated not established with a reason", not_established),
+                  ("no_observation_surface after probing the observable part, findings kept", unobservable_part)):
     e = validate(variant(fn))
     say(not e, "variant passes: " + label, "; ".join(e))
 
@@ -753,6 +759,145 @@ PY
   fi
 else
   nope "output-contract checks need agents/explorer.md, fixtures/example-explorer-output.json and the explore skill" ""
+fi
+
+# --- Explorer observation surface -------------------------------------------
+#
+# What the explorer may rest a verdict on. HTTP is observed with
+# curl -q -sS -i through shell and a redirect is never followed with -L; a
+# rendered view is never judged from source; a charter needing an observation
+# no tool can make ends no_observation_surface, whose status is blocked. The
+# frontmatter tools list stays read, search, glob and shell with no fetch
+# tool. Files are read as text and nothing is run.
+printf '\n'
+
+# True when a tools line names a fetch tool: any entry, compared in lower
+# case with underscores removed (so Codex's web_search counts), that is web
+# or websearch, contains "fetch", or sits under web/.
+tools_have_fetch() {
+  printf '%s\n' "$1" | awk '
+    { s = tolower($0); sub(/^tools:[ \t]*/, "", s); gsub(/[][" \t_]/, "", s); n = split(s, e, ",")
+      for (i = 1; i <= n; i++) if (e[i] == "web" || e[i] ~ /fetch/ || e[i] == "websearch" || e[i] ~ /^web\//) hit = 1 }
+    END { exit hit ? 0 : 1 }'
+}
+
+if [ -f "$EXPLORER" ] && [ -f "$EXPLORE_SKILL" ]; then
+  TOOLS_LINE=$(tr -d '\r' < "$EXPLORER" | awk '/^---$/ { c++; next } c == 1 && /^tools:/ { print; exit }')
+  if [ "$TOOLS_LINE" = 'tools: ["read", "search", "glob", "shell"]' ]; then
+    ok "explorer tools are exactly read, search, glob and shell"
+  else
+    nope "explorer tools are exactly read, search, glob and shell" "found: ${TOOLS_LINE}"
+  fi
+  if [ -n "$TOOLS_LINE" ] && ! tools_have_fetch "$TOOLS_LINE"; then
+    ok "explorer tools list has no fetch tool"
+  else
+    nope "explorer tools list has no fetch tool" "found: ${TOOLS_LINE}"
+  fi
+  MISSED_FETCH=""
+  for extra in '"web"' '"WebFetch"' '"web/fetch"' '"fetch"' '"WebSearch"' '"web_search"'; do
+    tools_have_fetch "tools: [\"read\", \"search\", \"glob\", \"shell\", ${extra}]" || MISSED_FETCH="${MISSED_FETCH} ${extra}"
+  done
+  if [ -z "$MISSED_FETCH" ]; then
+    ok "the fetch-tool check refuses a tools list that gains web or WebFetch"
+  else
+    nope "the fetch-tool check refuses a tools list that gains web or WebFetch" "accepted:${MISSED_FETCH}"
+  fi
+
+  MISSING_HTTP=""
+  for needle in '## What you can observe' \
+      '- **Observe HTTP through `shell` with curl'"'"'s `-sS -i` options, always led by `-q`: `curl -q -sS -i`.**' \
+      '`-q` keeps a `~/.curlrc` from slipping in options of its own, a hidden `-L` among them' \
+      '**Never add `-L` (or `--location`).**' \
+      'make one more request only when that URL'"'"'s scheme, host and port belong to a target the caller authorised' \
+      'any other destination is recorded as a result and never requested' \
+      'With no fetch tool in this definition'"'"'s tool list'; do
+    grep -qF -e "$needle" "$EXPLORER" || MISSING_HTTP="${MISSING_HTTP} [${needle}]"
+  done
+  if [ -z "$MISSING_HTTP" ]; then
+    ok "explorer observes HTTP with curl -q -sS -i and never follows a redirect with -L"
+  else
+    nope "explorer observes HTTP with curl -q -sS -i and never follows a redirect with -L" "missing:${MISSING_HTTP}"
+  fi
+
+  # A code span naming curl must not follow redirects: no -L, no option
+  # bundle holding L (such as -sSL), no --location. Reads text on stdin and
+  # prints each offending span with its line number.
+  curl_follow_spans() {
+    tr -d '\r' | awk '
+      { s = $0
+        while (match(s, /`[^`]*`/)) {
+          span = substr(s, RSTART, RLENGTH); s = substr(s, RSTART + RLENGTH)
+          if (span ~ /curl/ && (span ~ /[ \t]-[A-Za-z]*L/ || span ~ /--location/)) print NR ": " span
+        } }'
+  }
+  FOLLOWS=$(curl_follow_spans < "$EXPLORER")
+  if [ -z "$FOLLOWS" ]; then
+    ok "explorer offers no curl invocation that follows redirects"
+  else
+    nope "explorer offers no curl invocation that follows redirects" "$FOLLOWS"
+  fi
+  FOLLOW_MISSED=""
+  for sample in 'run `curl -L http://x`' 'run `curl -sSL http://x`' 'run `curl -q --location http://x`'; do
+    [ -n "$(printf '%s\n' "$sample" | curl_follow_spans)" ] || FOLLOW_MISSED="${FOLLOW_MISSED} [${sample}]"
+  done
+  [ -z "$(printf '%s\n' 'run `curl -q -sS -i http://x`' | curl_follow_spans)" ] || FOLLOW_MISSED="${FOLLOW_MISSED} [flagged curl -q -sS -i]"
+  if [ -z "$FOLLOW_MISSED" ]; then
+    ok "the redirect check catches -L, an option bundle such as -sSL, and --location"
+  else
+    nope "the redirect check catches -L, an option bundle such as -sSL, and --location" "wrong on:${FOLLOW_MISSED}"
+  fi
+
+  # Every curl command written in a code span opens with -q, so no
+  # ~/.curlrc can add options to it.
+  NO_Q=$(tr -d '\r' < "$EXPLORER" | awk '
+    { s = $0
+      while (match(s, /`curl [^`]*`/)) {
+        span = substr(s, RSTART, RLENGTH); s = substr(s, RSTART + RLENGTH)
+        if (index(span, "`curl -q ") != 1) print NR ": " span
+      } }')
+  if [ -z "$NO_Q" ] && grep -qF -e '`curl -q -sS -i`' "$EXPLORER"; then
+    ok "every curl invocation in the explorer starts with -q"
+  else
+    nope "every curl invocation in the explorer starts with -q" "${NO_Q:-no curl -q -sS -i span found}"
+  fi
+
+  if grep -qF -e '- **A charter without an HTTP surface** (a command-line tool, an import file, a log) is not affected by the curl rule; it ends by the card'"'"'s ordinary stop rules.' "$EXPLORER"; then
+    ok "a charter with no HTTP surface is untouched by the curl rule and ends by its ordinary stop rules"
+  else
+    nope "a charter with no HTTP surface is untouched by the curl rule and ends by its ordinary stop rules" ""
+  fi
+
+  MISSING_SURFACE=""
+  for needle in '**A rendered page is visible only through a tool you hold.**' \
+      '**Never judge any of these from HTML, CSS or template source**' \
+      'an environment context that names one is telling you what the caller has, not what you hold' \
+      '**When the charter calls for something your tools cannot observe, the session ends `no_observation_surface`.**' \
+      'then set `stop_reason: "no_observation_surface"`, which gives `status: "blocked"`.' \
+      '| `no_observation_surface` | `blocked` |' \
+      'The one exception is `no_observation_surface`, which wins over every stop that held with it.' \
+      '- **Part of the charter calls for something your tools cannot observe**'; do
+    grep -qF -e "$needle" "$EXPLORER" || MISSING_SURFACE="${MISSING_SURFACE} [${needle}]"
+  done
+  card_text | grep -qF -e '- `no_observation_surface`: the charter needs a view none of your tools can give; beats all other rules; `status` "blocked".' \
+    || MISSING_SURFACE="${MISSING_SURFACE} [card: no_observation_surface stop rule]"
+  if [ -z "$MISSING_SURFACE" ]; then
+    ok "explorer never judges rendered views from source and ends no_observation_surface as blocked"
+  else
+    nope "explorer never judges rendered views from source and ends no_observation_surface as blocked" "missing:${MISSING_SURFACE}"
+  fi
+
+  MISSING_SKILL=""
+  for needle in '`blocked` and `no_observation_surface` give `blocked`' \
+      'naming, for a `no_observation_surface` stop, what could not be observed' '`curl -q -sS -i`'; do
+    grep -qF -e "$needle" "$EXPLORE_SKILL" || MISSING_SKILL="${MISSING_SKILL} [${needle}]"
+  done
+  if [ -z "$MISSING_SKILL" ]; then
+    ok "explore skill handles no_observation_surface and curl -q -sS -i"
+  else
+    nope "explore skill handles no_observation_surface and curl -q -sS -i" "missing:${MISSING_SKILL}"
+  fi
+else
+  nope "observation-surface checks need agents/explorer.md and the explore skill" ""
 fi
 
 # --- summary ----------------------------------------------------------------
