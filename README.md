@@ -149,9 +149,13 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 
 **`fixtures/`** — worked examples of the full flow: an
 [example charter set](fixtures/example-charters.md), an
-[example session sheet](fixtures/example-session-sheet.md), and an
-[example debrief](fixtures/example-debrief.md). They double as concrete templates
-and as regression anchors for future smoke tests.
+[example session sheet](fixtures/example-session-sheet.md), an
+[example debrief](fixtures/example-debrief.md), and an
+[example explorer report](fixtures/example-explorer-output.json) in output
+contract `1.0`. They double as concrete templates and as regression anchors for
+the smoke tests: `lib/test-structure.sh` and `lib/test-structure.ps1` check the
+example report against the explorer's own contract tables, and setting
+`EXPLORER_OUTPUT` to a real report's path checks that report the same way.
 
 See also **[HEURISTICS.md](HEURISTICS.md)** for a one-page pointer to the lenses in
 the `heuristics` skill.
