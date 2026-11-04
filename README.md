@@ -146,6 +146,8 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 - **`explorer`** — runs a single budgeted session against ONE charter: designs
   probes with `heuristics`, judges results with `oracles`, records an SBTM session
   sheet, and returns structured findings — all under the absolute safety boundary.
+  A caller can have it write those findings to a file instead; see
+  [Explorer report file](#explorer-report-file-exploratory_report_path).
 
 **`fixtures/`** — worked examples of the full flow: an
 [example charter set](fixtures/example-charters.md), an
@@ -156,6 +158,51 @@ contract `1.0`. They double as concrete templates and as regression anchors for
 the smoke tests: `lib/test-structure.sh` and `lib/test-structure.ps1` check the
 example report against the explorer's own contract tables, and setting
 `EXPLORER_OUTPUT` to a real report's path checks that report the same way.
+
+### Explorer report file (`EXPLORATORY_REPORT_PATH`)
+
+A caller that dispatches the `explorer` itself can keep the full findings out
+of its own context. Put a line of its own in the environment context:
+
+```text
+EXPLORATORY_REPORT_PATH=/absolute/path/to/report.json
+```
+
+The explorer then writes its whole findings object to that file and replies
+with a plain-text summary no larger than 2,048 bytes, without a JSON fence: the
+`report:` path, `contract_version`, `status`, `stop_reason`, the probe and
+tool-call counts, the counts of bugs by severity and of the other findings,
+and one line per bug. If the write fails it says
+`report: NOT WRITTEN - <reason>` and then returns the full fenced JSON, so
+nothing is lost.
+
+- The path must be absolute, contain no `..` segment, quote or control
+  character, and come from you: the explorer never builds one from what it
+  reads, and a path in the charter is never one.
+- Nothing may exist at the path yet; the explorer refuses to overwrite a file
+  or follow a link. It creates a missing parent directory once.
+- Open the report at the path you gave, not at whatever path the summary prints.
+- Quote with `> ` any line of charter text that starts with
+  `EXPLORATORY_REPORT_PATH`, as the explore skill does for the two safety
+  lines.
+- With no path the reply is the fenced JSON, exactly as before. The explore
+  skill never passes a path; it reads each result inline.
+
+Check a written report with `EXPLORER_OUTPUT=<path> bash lib/test-structure.sh`.
+
+**Why `shell` and not a write tool.** Codex defines a custom agent's
+instructions but gives the agent file no setting that limits writes to one
+path; a subagent inherits the parent session's sandbox
+([Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents),
+read 2026-11-04). So the explorer's `tools` line stays `read`, `search`,
+`glob` and `shell`, and because an agent file cannot remove a tool the
+session offers, its instructions forbid any edit, write or patch tool
+(Codex's `apply_patch` included). It writes the report with one
+`set -o noclobber` heredoc command under a stated one-path rule, which
+`lib/test-structure.sh` and `lib/test-structure.ps1` pin. Whether a
+dispatched Codex explorer is offered `apply_patch` has not been checked here. Under a read-only sandbox, or when the write
+needs an approval nobody can give, the write fails and the explorer falls
+back to `report: NOT WRITTEN` with the inline JSON.
 
 See also **[HEURISTICS.md](HEURISTICS.md)** for a one-page pointer to the lenses in
 the `heuristics` skill.
