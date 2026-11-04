@@ -57,6 +57,12 @@ installed, Codex CLI auto-discovers the skills and agents — no further configu
 is needed. Codex has **no slash commands**: you drive the plugin by *activating
 skills* (see [Quick start](#quick-start)), not by typing `/commands`.
 
+Two skills keep long reference material in a `references/` directory of their own:
+`session` (`references/session-artifacts.md`, the full `.exploratory/` convention)
+and `bug-advocacy` (`references/worked-example-and-tone.md`). Both install paths
+ship it: the marketplace vendors the whole plugin tree, and `install.sh` and
+`install.ps1` copy a skill's `references/` directory alongside its `SKILL.md`.
+
 ## Prerequisites
 
 - **Codex CLI** — the plugin's skills and agents run inside it.
