@@ -148,6 +148,8 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 - **`explorer`** — runs a single budgeted session against ONE charter: designs
   probes with `heuristics`, judges results with `oracles`, records an SBTM session
   sheet, and returns structured findings — all under the absolute safety boundary.
+  It finds what it needs with `search` or `grep -n`, reads just a bounded range
+  with `sed -n` through `shell`, and never reads an unchanged file twice.
   A caller can have it write those findings to a file instead; see
   [Explorer report file](#explorer-report-file-exploratory_report_path).
 
