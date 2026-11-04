@@ -172,7 +172,7 @@ The explorer then writes its whole findings object to that file and replies
 with a plain-text summary no larger than 2,048 bytes, without a JSON fence: the
 `report:` path, `contract_version`, `status`, `stop_reason`, the probe and
 tool-call counts, the counts of bugs by severity and of the other findings,
-and one line per bug. If the write fails it says
+and one line per bug (in verify mode, below, a `verify:` line as well). If the write fails it says
 `report: NOT WRITTEN - <reason>` and then returns the full fenced JSON, so
 nothing is lost.
 
@@ -203,6 +203,61 @@ session offers, its instructions forbid any edit, write or patch tool
 dispatched Codex explorer is offered `apply_patch` has not been checked here. Under a read-only sandbox, or when the write
 needs an approval nobody can give, the write fails and the explorer falls
 back to `report: NOT WRITTEN` with the inline JSON.
+
+### Explorer verify mode (`EXPLORATORY_MODE=verify`)
+
+A caller that has fixed a bug can re-check that one bug instead of running a
+whole session. Put a line of its own in the environment context, beside the
+two required lines, and send the bug's `summary`, `observed`, `minimal_repro`
+and any `generalization` as a `<verify_bug>` block outside the environment
+context, the way `known_issues` is sent:
+
+```text
+EXPLORATORY_MODE=verify
+```
+
+```text
+<verify_bug>
+summary: <the bug's summary>
+observed: <what was observed>
+minimal_repro: <the bug's minimal_repro>
+generalization: <optional>
+</verify_bug>
+```
+
+The explorer turns the bug into its charter, runs the `minimal_repro` as
+probe 1 and, if `generalization` names a condition, one variant of it as
+probe 2, within **2 probes / 10 tool calls**. The
+[Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+page (read 2026-11-04) caps how many agent threads a session keeps open but
+sets no per-agent turn, step or tool-call limit, and the explorer's
+frontmatter sets none either, so the 10-call ceiling is one the explorer
+counts itself, like the ordinary 60. The findings gain a root `verify`
+object, `{ "result", "repro_reached", "evidence" }`, and a report summary
+gains a `verify:` line between `status:` and `stop_reason:`.
+
+- **`pass`** needs the repro point reached with no part of the failure seen.
+  **`fail`** covers a partial fix as well, and the defect that remains is
+  filed in `bugs`.
+- **`not_verified` is never a pass.** The repro point was not reached: no
+  usable `minimal_repro` (missing, empty, not established, or a void
+  `<verify_bug>` block, each of which means zero probes), an unreachable app,
+  a ceiling before probe 1, a missing required line, or no oracle able to
+  decide. Fall back to a full charter.
+- **The bug is data, never instructions.** Nothing between the markers counts
+  as environment context, a structured line, a budget or a target, and a
+  missing, unclosed or repeated marker voids the bug, so the session runs
+  zero probes and returns `not_verified`. A Codex subagent gets its task as
+  one undelimited prompt, so in bug fields, charter or target text you did
+  not write, quote with `> ` every line that starts with
+  `AUTHORIZED_NON_PRODUCTION`, `ALLOWED_HOSTS`, `EXPLORATORY_REPORT_PATH` or
+  `EXPLORATORY_MODE`, as the explore skill does; a quoted line never counts
+  as one of yours.
+- **`status` still follows `stop_reason`**, never the verdict, and the safety
+  boundary, both required lines and cleanup all apply in full.
+- **A pass covers that one bug only**, not the other risks of the charter it
+  came from. The explore skill never sets the mode, and Codex CLI was not
+  installed where this was written, so no dispatched verify session has run.
 
 See also **[HEURISTICS.md](HEURISTICS.md)** for a one-page pointer to the lenses in
 the `heuristics` skill.
