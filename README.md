@@ -136,7 +136,9 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
   framework rather than assuming one, and draft a regression check per convertible
   bug from its isolated minimal repro. Drafts are staged under
   `.exploratory/checks/` and are **never run** — it reports honestly which bugs it
-  could not convert and why.
+  could not convert and why. Given both a bug source and `--framework` it never
+  stops to ask, which lets a caller drive it with nobody watching; `--framework none`
+  means no runnable drafts, and an unreadable bug source halts it.
 
 **2 agents** (dispatched by the command-skills, not activated directly):
 
@@ -185,6 +187,9 @@ nothing is lost.
 - Quote with `> ` any line of charter text that starts with
   `EXPLORATORY_REPORT_PATH`, as the explore skill does for the two safety
   lines.
+- **Turning it into checks.** `stride-exploratory-testing-harden` accepts the
+  report file as its bug source: give it the path plus `--framework` and it takes
+  `bugs[]` out of the file (the summary is never used) and asks nothing.
 - With no path the reply is the fenced JSON, exactly as before. The explore
   skill never passes a path; it reads each result inline.
 
