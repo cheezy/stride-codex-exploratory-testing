@@ -5,6 +5,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The explorer's write rule no longer contradicts its cleanup rule** (W2675). This resolves the first of 0.3.0's *Known issues*. The last sentence of the tools paragraph in `agents/explorer.md` said the report was the one file the explorer could ever write, which, read literally, ruled out the scratch files the cleanup rule puts in a single `mktemp -d` directory. It now says the report is the only file written outside that scratch directory, and that the report never goes inside it. The report is still written with one `shell` command under the one-path rule, and the ban on edit, write and patch tools is unchanged. Both structure suites pin the new sentence under the existing label and gain one check, with the same label in bash and PowerShell, that fails if the old sentence comes back. Each suite now runs 205 checks.
+
 ## [0.3.0] - 2026-11-04
 
 The G449-G451 batch from the Claude Code plugin, carried over to Codex CLI in this edition's own words. Most of it lands in the `explorer` agent: an inline rules card, output contract `1.0`, a curl-only way of observing HTTP with a `no_observation_surface` ending, a safety boundary built from two required lines, an optional report file with a short summary reply, a verify mode and a rule for reading files in ranges. The harden skill can now run without asking questions, and the descriptions Codex loads in every session are shorter, with two long skill sections moved into per-skill `references/` files.
