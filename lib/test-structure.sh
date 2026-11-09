@@ -29,8 +29,14 @@
 # the trimmed descriptions (no <example> block or port filler, triggers and the
 # explorer's safety statement kept, at most 800 bytes) and the two references/
 # files: the moved headings, the stubs, the repointed citations and the
-# installers' references/ copy. Pure shell + python3 (for JSON) — no network,
-# no jq.
+# installers' references/ copy. Then the heuristics catalog's twelve
+# change-risk lenses: one row each, found by its trimmed first cell, under its
+# General or Web change-risk sub-heading with an E.g. example and a
+# When-a-change trigger, nine General rows and three Web, the web-only
+# three never under General, no Tour collision, the in-app and authorized-only
+# framing, curl -q -sS -i through shell and no other edition's tool, no
+# task-identifier or project-name leak, and every lens named in HEURISTICS.md.
+# Pure shell + python3 (for JSON) — no network, no jq.
 #
 # Exit code: 0 if every check passes; 1 if any check fails.
 
@@ -1899,6 +1905,179 @@ if [ "$TD_OK" -eq 1 ]; then
   if grep -qF -e '"skills": "./skills/"' "$TD_DIR/.codex-plugin/plugin.json"; then ok "$L"; else nope "$L" "the manifest does not name ./skills/"; fi
 else
   nope 'description and reference checks need every trimmed file, both references and both installers' ""
+fi
+
+# --- Change-risk lenses -------------------------------------------------------
+#
+# Twelve lenses picked by the kind of change under test. Each is exactly one
+# row of a three-column table under its General or Web change-risk sub-heading,
+# with an "E.g. " example and a "When a change ..." trigger; the General table
+# holds nine rows and the Web table three. A row is found by its first cell
+# with surrounding spaces trimmed, so a copy with other spacing still counts,
+# and the files are read with carriage returns stripped, as the PowerShell
+# mirror reads them. The web-only three never sit under General Heuristics, no
+# lens name collides with a Tour, Pull the Rug and After the Headers stay
+# in-app, Other Verbs and Response Hardening are authorized-only, the tool
+# named is curl -q -sS -i through shell with no other edition's tool and no
+# redirect-following curl, neither file leaks a task identifier or project
+# name, HEURISTICS.md names every lens, and the README counts twelve.
+printf '\n'
+HEUR_PAGE="${PLUGIN_ROOT}/HEURISTICS.md"
+CR_G='### General change-risk lenses'
+CR_W='### Web change-risk lenses'
+
+cr_line() { grep -nxF -- "$1" "$CR_HEUR" | head -1 | cut -d: -f1; }
+
+# Table rows whose first cell, trimmed, is exactly the bold name; with a start
+# and a stop heading, only the rows between them.
+cr_rows() { # name [start-heading stop-heading]
+  awk -F'|' -v cell="**$1**" -v start="${2-}" -v stop="${3-}" '
+    start != "" && $0 == start { f = 1; next }
+    start != "" && f && $0 == stop { f = 0 }
+    start != "" && !f { next }
+    /^[ \t]*\|/ { c = $2; gsub(/^[ \t]+|[ \t]+$/, "", c); if (c == cell) print }' "$CR_HEUR"
+}
+
+# Every table row (any line starting with a pipe, header and separator aside)
+# between two exact headings.
+cr_table_rows() {
+  awk -v start="$1" -v stop="$2" '
+    $0 == start { f = 1; next }
+    f && $0 == stop { f = 0 }
+    f && /^[ \t]*\|/ && $0 != "| Heuristic | What to try | When it applies |" && $0 !~ /^\|[-|]+\|$/ { n++ }
+    END { print n + 0 }' "$CR_HEUR"
+}
+
+# Every given row has three cells, an "E.g. " example in What to try, and a
+# trigger of more than 20 characters that starts "When a change ".
+cr_row_ok() {
+  printf '%s\n' "$1" | awk -F'|' '
+    { t = $3; w = $4
+      gsub(/^ +| +$/, "", t); gsub(/^ +| +$/, "", w)
+      if (NF != 5 || index(t, "E.g. ") == 0 || w !~ /^When a change [^ ]/ || length(w) <= 20) bad = 1
+      n++ }
+    END { exit (n > 0 && !bad) ? 0 : 1 }'
+}
+
+cr_check() { # name start-heading stop-heading label
+  _crn="$1"; _crcount=0; _crtotal=0
+  _crall=$(cr_rows "$_crn")
+  [ -n "$_crall" ] && _crtotal=$(printf '%s\n' "$_crall" | wc -l | tr -d ' ')
+  _crrows=$(cr_rows "$_crn" "$2" "$3")
+  [ -n "$_crrows" ] && _crcount=$(printf '%s\n' "$_crrows" | wc -l | tr -d ' ')
+  if [ "$_crtotal" = "1" ] && [ "$_crcount" = "1" ]; then
+    ok "heuristics lists change-risk lens once, under its $4 sub-heading: ${_crn}"
+  else
+    nope "change-risk lens is missing, duplicated or outside its $4 sub-heading" "${_crn} (rows in file: ${_crtotal}, under sub-heading: ${_crcount})"
+  fi
+  if [ "$_crcount" -ge 1 ] && cr_row_ok "$_crrows"; then
+    ok "change-risk lens has an E.g. example and a When-a-change trigger: ${_crn}"
+  else
+    nope "change-risk lens lacks a three-cell row with an E.g. example and a When-a-change trigger" "$_crn"
+  fi
+  if grep -qF -- "- **${_crn} Tour** —" "$CR_HEUR" || grep -qF -- "- **${_crn}** —" "$CR_HEUR"; then
+    nope "change-risk lens name collides with a Tour" "$_crn"
+  else
+    ok "change-risk lens does not collide with a Tour: ${_crn}"
+  fi
+  if grep -qF -- "$_crn" "$CR_PAGE"; then
+    ok "HEURISTICS.md names change-risk lens: ${_crn}"
+  else
+    nope "HEURISTICS.md does not name change-risk lens" "$_crn"
+  fi
+}
+
+if [ -f "$HEUR" ] && [ -f "$HEUR_PAGE" ]; then
+  CR_TMP=$(mktemp -d "${TMPDIR:-/tmp}/cr-lenses.XXXXXX")
+  CR_HEUR="$CR_TMP/SKILL.md"; CR_PAGE="$CR_TMP/HEURISTICS.md"
+  tr -d '\r' < "$HEUR" > "$CR_HEUR"; tr -d '\r' < "$HEUR_PAGE" > "$CR_PAGE"
+  L_GEN=$(cr_line '## General Heuristics'); L_CRG=$(cr_line "$CR_G")
+  L_WEB=$(cr_line '## Web Heuristics'); L_CRW=$(cr_line "$CR_W")
+  L_VAR=$(cr_line '## Variable Catalog')
+  if [ -n "$L_GEN" ] && [ -n "$L_CRG" ] && [ -n "$L_WEB" ] && [ -n "$L_CRW" ] && [ -n "$L_VAR" ] \
+      && [ "$L_GEN" -lt "$L_CRG" ] && [ "$L_CRG" -lt "$L_WEB" ] \
+      && [ "$L_WEB" -lt "$L_CRW" ] && [ "$L_CRW" -lt "$L_VAR" ]; then
+    ok "change-risk sub-headings sit inside General Heuristics and Web Heuristics, in order"
+  else
+    nope "change-risk sub-headings are missing or out of order" "general=${L_CRG:-none} web=${L_CRW:-none}"
+  fi
+  CR_HEADERS=$(grep -cxF -- '| Heuristic | What to try | When it applies |' "$CR_HEUR")
+  if [ "$CR_HEADERS" = "2" ]; then
+    ok "both change-risk tables carry a When it applies column"
+  else
+    nope "expected two '| Heuristic | What to try | When it applies |' table headers" "found ${CR_HEADERS}"
+  fi
+  CR_NG=$(cr_table_rows "$CR_G" '## Web Heuristics'); CR_NW=$(cr_table_rows "$CR_W" '## Variable Catalog')
+  if [ "$CR_NG" = "9" ] && [ "$CR_NW" = "3" ]; then
+    ok "the change-risk tables hold twelve rows: nine General and three Web"
+  else
+    nope "the change-risk tables do not hold nine General and three Web rows" "general rows: ${CR_NG}, web rows: ${CR_NW}"
+  fi
+  for name in 'Change the Rights' 'Shadow Decision' 'Who Else Is Watching' 'Pull the Rug' \
+      'Every Surface' 'Every Locale' 'Developer Guidebook' 'Leave No Trace' 'Telemetry Semantics'; do
+    cr_check "$name" "$CR_G" '## Web Heuristics' General
+  done
+  for name in 'Other Verbs' 'After the Headers' 'Response Hardening'; do
+    cr_check "$name" "$CR_W" '## Variable Catalog' Web
+    if [ -n "$(cr_rows "$name" '## General Heuristics' '## Web Heuristics')" ]; then
+      nope "web-only lens listed under General Heuristics" "$name"
+    else
+      ok "web-only lens stays out of General Heuristics: ${name}"
+    fi
+  done
+  for pair in 'After the Headers|real server' 'After the Headers|in-process test adapter' \
+      'After the Headers|in-app' 'Pull the Rug|in-app' 'Pull the Rug|test data you created' \
+      'Other Verbs|authorized testing of your own system only' \
+      'Response Hardening|authorized testing of your own system only' \
+      'After the Headers|`curl -q -sS -i` through `shell`' \
+      'Leave No Trace|through `shell`'; do
+    name="${pair%%|*}"; needle="${pair#*|}"
+    if cr_rows "$name" | grep -qF -- "$needle"; then
+      ok "change-risk lens ${name} says: ${needle}"
+    else
+      nope "change-risk lens is missing required framing" "${name}: ${needle}"
+    fi
+  done
+  for name in 'Pull the Rug' 'After the Headers'; do
+    if cr_rows "$name" | grep -qiE 'kill|network'; then
+      nope "Interrupt-style change-risk lens mentions killing or the network" "$name"
+    else
+      ok "Interrupt-style change-risk lens offers no kill or network means: ${name}"
+    fi
+  done
+  MISSING_CR=$(absent_needles "$CR_HEUR" skills/heuristics \
+    '**Pull the Rug and After the Headers share the Interrupt limits.**' \
+    'Never stop the server or a process you did not start' \
+    '**Other Verbs and Response Hardening are for authorized testing of your own system only**' \
+    'start with its **change-risk lenses**' 'extends the **Guidebook Tour**' \
+    'Make these requests with `curl -q -sS -i` through `shell`' \
+    'never follow a redirect with `-L`')
+  MISSING_CR="${MISSING_CR}$(absent_needles "${PLUGIN_ROOT}/README.md" README.md 'twelve change-risk lenses')"
+  if [ -z "$MISSING_CR" ]; then
+    ok "heuristics documents the change-risk framing, limits and this edition's tool"
+  else
+    nope "heuristics is missing change-risk wording" "missing:${MISSING_CR}"
+  fi
+  # This edition's shell tool is shell; no other edition's tool name may have
+  # been carried over, and no request in the catalog follows a redirect.
+  CR_FOREIGN=$(grep -cE 'through `(bash|execute|run|run_shell_command)`|curl [^`]*(-[A-Za-z]*L|--location)' "$CR_HEUR")
+  if [ "$CR_FOREIGN" = "0" ]; then
+    ok "heuristics names only this edition's shell tool and never follows a redirect"
+  else
+    nope "heuristics names another edition's shell tool or a redirect-following curl" "${CR_FOREIGN} line(s)"
+  fi
+  for doc in skills/heuristics/SKILL.md HEURISTICS.md; do
+    LEAKS=$(grep -cE '(^|[^A-Za-z0-9])[GWD][0-9]{3,}([^0-9]|$)' "${PLUGIN_ROOT}/${doc}")
+    PROJECT=$(grep -ciE 'kanban|PlansHelpers|ConnCase|register_and_log_in_user' "${PLUGIN_ROOT}/${doc}")
+    if [ "$LEAKS" = "0" ] && [ "$PROJECT" = "0" ]; then
+      ok "${doc} names no task identifier or project name"
+    else
+      nope "${doc} leaks a task identifier or project name" "identifier lines: ${LEAKS}, project lines: ${PROJECT}"
+    fi
+  done
+  rm -f -- "$CR_HEUR" "$CR_PAGE"; rmdir -- "$CR_TMP"
+else
+  nope "change-risk lens checks need skills/heuristics/SKILL.md and HEURISTICS.md" ""
 fi
 
 # --- summary ----------------------------------------------------------------

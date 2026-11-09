@@ -101,8 +101,9 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
   with SFDIPOT and the Nightmare Headline Game, and reframe a "charter" that's really
   a test case.
 - **`heuristics`** — the plugin's single source of truth for concrete test-idea
-  lenses: general and web cheat sheets, a variable-spotting catalog, and Whittaker's
-  Tours grouped by tourist district.
+  lenses: general and web cheat sheets with twelve change-risk lenses chosen by the
+  kind of change under test, a variable-spotting catalog, and Whittaker's Tours
+  grouped by tourist district.
 - **`oracles`** — how to decide whether an observed result is a defect: Never/Always
   invariants, consistency oracles (history, comparable products, standards, claims,
   user expectations, purpose), and the HTSM quality-criteria checklist.
@@ -374,7 +375,8 @@ you named yourself.
 ## Heuristics reference
 
 The `heuristics` skill is the canonical catalog of test-idea lenses — general and
-web cheat sheets, the variable catalog, and Whittaker's Tours. **[HEURISTICS.md](HEURISTICS.md)**
+web cheat sheets with their change-risk lenses, the variable catalog, and Whittaker's
+Tours. **[HEURISTICS.md](HEURISTICS.md)**
 is a one-page index that points into it; it deliberately does *not* duplicate the
 tables, so there is a single source of truth to maintain.
 
