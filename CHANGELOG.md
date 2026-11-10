@@ -5,7 +5,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.3] - 2026-11-10
+
+A fix to the PowerShell structure suite and two new interrupt tests, from D413 (`6af4319`), the one commit since 0.4.2. It resolves the second of 0.4.2's *Known issues*. No agent, skill, installer or manifest key changed. Both structure suites still run 415 checks each, with identical labels in bash and PowerShell, and each `test-all` runner now also runs its own interrupt script, `lib/test-interrupt.sh` from `test-all.sh` and `lib/test-interrupt.ps1` from `test-all.ps1`. The release commit bumps `.codex-plugin/plugin.json` to 0.4.3 and renames the `[Unreleased]` heading D413 added to this one, so the newest version is the first heading, as at 0.4.2.
 
 ### Fixed
 
