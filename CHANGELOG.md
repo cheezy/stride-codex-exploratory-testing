@@ -5,7 +5,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.2] - 2026-11-10
+
+A fix to the bash structure suite and two command-skill changes, from W2686 (`955f6c3`), the one commit since 0.4.1. No agent, installer or other skill changed. Both structure suites now run 415 checks each, with identical labels in bash and PowerShell. The release commit bumps `.codex-plugin/plugin.json` to 0.4.2 and renames the `[Unreleased]` heading W2686 added to this one, so the newest version is the first heading, as at 0.4.1 and 0.4.0.
 
 ### Fixed
 
