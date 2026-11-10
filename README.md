@@ -152,7 +152,11 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 
 - **`charter-generator`** — turns a target (plus optional risk context) into a
   ranked list of charters via an SFDIPOT sweep, charter-source mining, and the
-  Nightmare Headline Game. Read-only; generates only, never executes.
+  Nightmare Headline Game. Given an optional change context, it charters a code
+  change: every edge case is chartered or named as covered by a unit test the
+  change names, the change-risk lenses whose triggers match are applied, and each
+  charter is tagged with the surface it needs. Read-only; generates only, never
+  executes.
 - **`explorer`** — runs a single budgeted session against ONE charter: designs
   probes with `heuristics`, judges results with `oracles`, records an SBTM session
   sheet, and returns structured findings — all under the absolute safety boundary.
