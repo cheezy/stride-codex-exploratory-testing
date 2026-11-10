@@ -106,7 +106,8 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
   grouped by tourist district.
 - **`oracles`** — how to decide whether an observed result is a defect: Never/Always
   invariants, consistency oracles (history, comparable products, standards, claims,
-  user expectations, purpose), and the HTSM quality-criteria checklist.
+  user expectations, purpose), the Adapter Is Not the Wire and Two Decision Sites
+  oracles, and the HTSM quality-criteria checklist.
 - **`bug-advocacy`** — what happens after an oracle says something is wrong: Cem
   Kaner's RIMGEA follow-through (Replicate, Isolate, Maximize, Generalize,
   Externalize, And say it clearly), a severity rubric with explicit per-level

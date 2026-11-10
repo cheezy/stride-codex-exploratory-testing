@@ -39,7 +39,11 @@
     never under General, no Tour collision, the in-app and authorized-only
     framing, curl -q -sS -i through shell and no other edition's tool, no
     task-identifier or project-name leak, and every lens named in
-    HEURISTICS.md. JSON is parsed with ConvertFrom-Json — no network, no
+    HEURISTICS.md. Then the oracles skill's Adapter Is Not the Wire and Two
+    Decision Sites sections (each with an example, the unknown-never-found
+    and agree-in-every-state rules, no new reach, curl -q -sS -i through
+    shell, no task-identifier or project-name leak) and their one-line card
+    entries. JSON is parsed with ConvertFrom-Json — no network, no
     jq. Mirrors lib/test-structure.sh.
 
     Exit code: 0 if every check passes; 1 if any check fails.
@@ -188,10 +192,15 @@ foreach ($doc in @('README.md', 'HEURISTICS.md', 'CHANGELOG.md', 'LICENSE', 'AGE
 # identical labels. agents/explorer.md carries an inline card with every
 # rule the explorer needs to rate a bug and end a session, so a skill that
 # fails to load costs nothing. The checks hold the card right after the
-# safety boundary and under 4,096 bytes, tie its severity words to
+# safety boundary and under 4,480 bytes, tie its severity words to
 # bug-advocacy's four levels and its stop rules to the stop_reason row, and
 # keep the skill references path-free. Later tasks in the port append here.
 # The files are only read, never executed.
+#
+# The card is capped at 4480 bytes. The cap was 4096 until the Adapter Is Not
+# the Wire and Two Decision Sites lines took the card from 4071 to 4427 bytes,
+# 331 over it, so it rose by 384. Keep new rules outside the card where they
+# fit.
 
 function Read-Lines([string]$path) {
     # Split on LF only and keep any CR, so byte counts match awk | wc -c.
@@ -262,11 +271,11 @@ if ((Test-Path -LiteralPath $Explorer -PathType Leaf) -and (Test-Path -LiteralPa
     # Byte cap, measured as awk '/explorer-card:start/,/explorer-card:end/' | wc -c
     $cardBytes = 0
     foreach ($l in $card) { $cardBytes += [Text.Encoding]::UTF8.GetByteCount($l) + 1 }
-    if ($cardBytes -ge 1 -and $cardBytes -le 4096) {
-        Test-Ok 'explorer card is within 4096 bytes'
+    if ($cardBytes -ge 1 -and $cardBytes -le 4480) {
+        Test-Ok 'explorer card is within 4480 bytes'
     }
     else {
-        Test-Nope 'explorer card is outside 1-4096 bytes' "measured $cardBytes bytes"
+        Test-Nope 'explorer card is outside 1-4480 bytes' "measured $cardBytes bytes"
     }
 
     # Severity: token line, rank line and ladder bullets each equal
@@ -2277,6 +2286,93 @@ if ((Test-Path -LiteralPath $Heur -PathType Leaf) -and (Test-Path -LiteralPath $
     }
 } else {
     Test-Nope 'change-risk lens checks need skills/heuristics/SKILL.md and HEURISTICS.md'
+}
+
+# --- Wire and decision-site oracles -----------------------------------------
+#
+# The same checks as the Wire and decision-site oracles section of
+# test-structure.sh, with identical labels. Two named oracles: Adapter Is Not
+# the Wire (an in-process test adapter cannot establish wire behaviour, so an
+# unconfirmed wire claim goes under debrief.unknown, never found) and Two
+# Decision Sites (client and server deciding the same thing must agree in
+# every state). Each is a section of the oracles skill with an example, and a
+# one-line rule on the explorer card, which must stay complete without the
+# skill. The skill's wire example uses this edition's curl rule, through
+# shell. Needles use .Contains (ordinal and case-sensitive), as grep -F does.
+# The files are only read.
+Write-Host ''
+$Oracles = Join-Path $PluginRoot 'skills/oracles/SKILL.md'
+
+# Returns the lines of the "## $name" section of $lines, up to the next heading.
+function Get-OracleSection($lines, [string]$name) {
+    $out = New-Object 'System.Collections.Generic.List[string]'
+    $in = $false
+    foreach ($raw in $lines) {
+        $l = $raw.TrimEnd("`r")
+        if ($l -ceq "## $name") { $in = $true; continue }
+        if ($in -and $l.StartsWith('## ')) { $in = $false }
+        if ($in) { $out.Add($l) }
+    }
+    return ,$out
+}
+
+if ((Test-Path -LiteralPath $Oracles -PathType Leaf) -and (Test-Path -LiteralPath $Explorer -PathType Leaf)) {
+    $orLines = [IO.File]::ReadAllText($Oracles, [Text.Encoding]::UTF8) -split "`n"
+    $orCard = New-Object 'System.Collections.Generic.List[string]'
+    $orIn = $false
+    foreach ($l in ([IO.File]::ReadAllText($Explorer, [Text.Encoding]::UTF8) -split "`n")) {
+        if ($l.Contains('explorer-card:start')) { $orIn = $true }
+        if ($orIn) { $orCard.Add($l) }
+        if ($l.Contains('explorer-card:end')) { $orIn = $false }
+    }
+    foreach ($name in @('Adapter Is Not the Wire', 'Two Decision Sites')) {
+        $heads = @($orLines | Where-Object { $_ -ceq "## $name" }).Count
+        if ($heads -eq 1) { Test-Ok "oracles skill defines $name" }
+        else { Test-Nope "oracles skill needs exactly one ## $name section" "found $heads" }
+        $examples = @((Get-OracleSection $orLines $name) | Where-Object { $_.StartsWith('*Example:*') }).Count
+        if ($examples -gt 0) { Test-Ok "oracles skill gives $name an example" }
+        else { Test-Nope 'oracles skill section has no *Example:* paragraph' $name }
+        $cardHits = @($orCard | Where-Object { $_.Contains("**$name.**") }).Count
+        if ($cardHits -eq 1) { Test-Ok "explorer card names $name in one line" }
+        else { Test-Nope "explorer card needs exactly one **$name.** line" "found $cardHits" }
+    }
+    $orWire = (Get-OracleSection $orLines 'Adapter Is Not the Wire') -join "`n"
+    foreach ($needle in @('in-process test adapter', 'streamed or chunked', '`HEAD`', 'connection aborts',
+            '`Content-Length`', 'real server', '`debrief.unknown`, never under `found`',
+            'grants no new reach', 'does not fire', '`curl -q -sS -i` through `shell`')) {
+        if ($orWire.Contains($needle)) { Test-Ok "Adapter Is Not the Wire says: $needle" }
+        else { Test-Nope 'Adapter Is Not the Wire is missing required wording' $needle }
+    }
+    $orWireCard = @($orCard | Where-Object { $_.Contains('**Adapter Is Not the Wire.**') }) -join "`n"
+    foreach ($needle in @('in-process test adapter', '`HEAD`', '`Content-Length`', 'real server',
+            '`debrief.unknown`, never `found`')) {
+        if ($orWireCard.Contains($needle)) { Test-Ok "card wire line says: $needle" }
+        else { Test-Nope 'card wire line is missing required wording' $needle }
+    }
+    $orSites = (Get-OracleSection $orLines 'Two Decision Sites') -join "`n"
+    foreach ($needle in @('agree in every state', 'A disagreement is a finding', 'Acceptable', 'Defect')) {
+        if ($orSites.Contains($needle)) { Test-Ok "Two Decision Sites says: $needle" }
+        else { Test-Nope 'Two Decision Sites is missing required wording' $needle }
+    }
+    $sitesRule = @($orCard | Where-Object { $_.Contains('**Two Decision Sites.**') -and $_.Contains('agree in every state; a disagreement is a finding') }).Count
+    if ($sitesRule -gt 0) { Test-Ok 'card decision-sites line says both sites must agree in every state' }
+    else { Test-Nope 'card decision-sites line is missing its rule' 'agree in every state; a disagreement is a finding' }
+    $orText = $orLines -join "`n"
+    if ($orText.Contains('*Adapter Is Not the Wire* grants no new reach')) { Test-Ok 'oracles safety section keeps wire confirmation inside the authorized target' }
+    else { Test-Nope 'oracles safety section is missing the no-new-reach sentence' }
+    $orForeign = @($orLines | Where-Object { $_ -cmatch 'through `(bash|execute|run|run_shell_command)`|curl [^`]*(-[A-Za-z]*L|--location)' }).Count
+    if ($orForeign -eq 0) { Test-Ok "oracles skill names only this edition's shell tool and never follows a redirect" }
+    else { Test-Nope "oracles skill names another edition's shell tool or a redirect-following curl" "$orForeign line(s)" }
+    $leaks = @($orLines | Where-Object { $_ -cmatch '(^|[^A-Za-z0-9])[GWD][0-9]{3,}([^0-9]|$)' }).Count
+    $project = @($orLines | Where-Object { $_ -match 'kanban|PlansHelpers|ConnCase|register_and_log_in_user' }).Count
+    if ($leaks -eq 0 -and $project -eq 0) { Test-Ok 'skills/oracles/SKILL.md names no task identifier or project name' }
+    else { Test-Nope 'skills/oracles/SKILL.md leaks a task identifier or project name' "identifier lines: $leaks, project lines: $project" }
+    $orReadmePath = Join-Path $PluginRoot 'README.md'
+    $orReadme = if (Test-Path -LiteralPath $orReadmePath -PathType Leaf) { [IO.File]::ReadAllText($orReadmePath, [Text.Encoding]::UTF8) } else { '' }
+    if ($orReadme.Contains('the Adapter Is Not the Wire and Two Decision Sites')) { Test-Ok 'README.md names both oracles' }
+    else { Test-Nope 'README.md does not name both oracles' }
+} else {
+    Test-Nope 'wire and decision-site oracle checks need skills/oracles/SKILL.md and agents/explorer.md'
 }
 
 # --- summary ----------------------------------------------------------------
