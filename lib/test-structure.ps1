@@ -43,8 +43,14 @@
     Decision Sites sections (each with an example, the unknown-never-found
     and agree-in-every-state rules, no new reach, curl -q -sS -i through
     shell, no task-identifier or project-name leak) and their one-line card
-    entries. JSON is parsed with ConvertFrom-Json — no network, no
-    jq. Mirrors lib/test-structure.sh.
+    entries. Then the .exploratory.md project environment file: its format
+    doc and placeholders-only template (never installed), the explore skill
+    reading it before its question round and using it only once confirmed,
+    the save offer, the PROBE_HARNESS / PROBE_SERVICES / PROBE_DIR lines,
+    and the explorer's harness surface kept off the card. The output
+    contract is 1.1, with session_sheet.surfaces_used. JSON is parsed
+    with ConvertFrom-Json — no network, no jq. Mirrors
+    lib/test-structure.sh.
 
     Exit code: 0 if every check passes; 1 if any check fails.
 #>
@@ -411,7 +417,7 @@ else {
 
 # --- Explorer output contract ----------------------------------------------
 #
-# The PowerShell side of the bash contract section, with the same labels.
+# The PowerShell side of the bash contract section (contract 1.1), with the same labels.
 # It reads the tables in agents/explorer.md (root keys and element shapes,
 # the bugs fields, the session_sheet fields, the status-from-stop_reason
 # table), the documented contract_version and the card's severity words,
@@ -617,8 +623,8 @@ if ($contractReady -and $contract -ne '') {
     $mapOk = ($derive.Count -eq $expected.Count)
     foreach ($k in $expected.Keys) { if (-not $derive.Contains($k) -or $derive[$k] -cne $expected[$k]) { $mapOk = $false } }
     $tableShown = @($derive.Keys | ForEach-Object { "$($_)=$($derive[$_])" }) -join ' '
-    if ($mapOk) { Test-Ok 'the status table maps each stop_reason exactly as contract 1.0 defines' }
-    else { Test-Nope 'the status table maps each stop_reason exactly as contract 1.0 defines' "table=[$tableShown]" }
+    if ($mapOk) { Test-Ok 'the status table maps each stop_reason exactly as contract 1.1 defines' }
+    else { Test-Nope 'the status table maps each stop_reason exactly as contract 1.1 defines' "table=[$tableShown]" }
     # The mapping check must catch a stop_reason left without a row: drop one row in memory and re-check.
     $droppedText = [regex]::Replace($deriveText, '(?m)^\| `tool_call_ceiling` \|.*\n', '')
     $dropped = New-Object 'System.Collections.Generic.List[string]'
@@ -644,8 +650,8 @@ if ($contractReady -and $contract -ne '') {
     }
     if ($typed) { Test-Ok 'questions_risks, off_charter and known_bad have defined element types' }
     else { Test-Nope 'questions_risks, off_charter and known_bad have defined element types' 'a row has no {...} element shape' }
-    if ($version -ceq '1.0') { Test-Ok 'contract_version is documented as "1.0"' }
-    else { Test-Nope 'contract_version is documented as "1.0"' "found '$version'" }
+    if ($version -ceq '1.1') { Test-Ok 'contract_version is documented as "1.1"' }
+    else { Test-Nope 'contract_version is documented as "1.1"' "found '$version'" }
     $vLabel = 'the optional verify root key documents result (pass, fail or not_verified), repro_reached and evidence'
     $vSpec = if ($elements.Contains('verify')) { $elements['verify'] } else { @($null, @{}) }
     $vKeysDoc = if ($null -ne $vSpec[0]) { @($vSpec[0]) -join ' ' } else { '' }
@@ -656,8 +662,24 @@ if ($contractReady -and $contract -ne '') {
     else { Test-Nope $vLabel "keys=[$vKeysDoc] result=[$vResults]" }
     if (($severities -join ' ') -ceq 'Critical High Moderate Minor') { Test-Ok 'card severity words parsed' }
     else { Test-Nope 'card severity words parsed' "[$($severities -join ' ')]" }
+    # Contract 1.1 added session_sheet.surfaces_used, drawn from four named surfaces.
+    $surfaces = @()
+    if ($sheet.Contains('surfaces_used')) {
+        $sum = [regex]::Match($sheet['surfaces_used'].notes, 'drawn only from (.*?):')
+        if ($sum.Success) { $surfaces = [string[]](Get-Ticked $sum.Groups[1].Value '`([a-z]+)`') }
+    }
+    $suLabel = 'session_sheet.surfaces_used is documented as an array drawn from http, harness, browser and source'
+    if (($surfaces -join ' ') -ceq 'http harness browser source') { Test-Ok $suLabel }
+    else { Test-Nope $suLabel "found [$($surfaces -join ' ')]" }
+    $suType = if ($sheet.Contains('surfaces_used')) { $sheet['surfaces_used'].type } else { '' }
+    if ($suType -ceq 'array of strings') { Test-Ok 'session_sheet.surfaces_used is typed array of strings' }
+    else { Test-Nope 'session_sheet.surfaces_used is typed array of strings' "found '$suType'" }
+    $suPara = '**Contract `' + $version + '` added this, and consumers treat it as optional:** `session_sheet.surfaces_used`'
+    $suOld = 'so an older consumer reads a `' + $version + '` report unchanged'
+    if ($contract.Contains($suPara) -and $contract.Contains($suOld)) { Test-Ok 'surfaces_used is declared optional to consumers in the 1.1 paragraph' }
+    else { Test-Nope 'surfaces_used is declared optional to consumers in the 1.1 paragraph' 'the contract 1.1 paragraph is missing' }
 
-    # The explore skill reads results by contract 1.0: its key list names every required root key.
+    # The explore skill reads results by contract 1.1: its key list names every required root key.
     # verify is optional and belongs to verify mode, which the skill never sets, so it is not listed.
     $cp = [regex]::Match($skillText, '(?m)^\*\*Collect and parse\.\*\*.*$')
     $listed = New-Set @()
@@ -668,11 +690,11 @@ if ($contractReady -and $contract -ne '') {
         $listed = New-Set ([string[]](Get-Ticked $head '`([a-z_]+)`'))
     }
     $keyDiff = @(@($requiredRoot | Where-Object { -not $listed.Contains($_) }) + @($listed | Where-Object { -not $requiredRoot.Contains($_) }) | Sort-Object)
-    if ($cp.Success -and $cp.Value.Contains('output contract `1.0`') -and $keyDiff.Count -eq 0 -and
+    if ($cp.Success -and $cp.Value.Contains('output contract `' + $version + '`') -and $keyDiff.Count -eq 0 -and
         $skillText.Contains('**Trust `stop_reason`, not `status`.**')) {
-        Test-Ok 'explore skill reads explorer results by contract 1.0'
+        Test-Ok 'explore skill reads explorer results by contract 1.1'
     } else {
-        Test-Nope 'explore skill reads explorer results by contract 1.0' "its Collect and parse list differs from the agent's required root keys: [$($keyDiff -join ' ')]"
+        Test-Nope 'explore skill reads explorer results by contract 1.1' "its Collect and parse list differs from the agent's required root keys: [$($keyDiff -join ' ')]"
     }
     # The skill restates the derivation table (it cannot open the agent file); the
     # restatement must give exactly the agent table's mapping.
@@ -732,6 +754,17 @@ if ($contractReady -and $contract -ne '') {
             if (($ss.on_charter_probes + $ss.off_charter_probes) -ne $ss.probes_attempted) { $errs.Add('on + off charter probes do not equal probes_attempted') }
         } else {
             $errs.Add('a session_sheet count is not an integer')
+        }
+        $suGot = Get-Prop $ss 'surfaces_used'
+        if ($sheet.Contains('surfaces_used') -and $suGot[0]) {
+            $su = $suGot[1]
+            if (-not (Test-IsList $su) -or @($su | Where-Object { -not ($_ -is [string]) }).Count -gt 0) {
+                $errs.Add('session_sheet.surfaces_used is not an array of strings')
+            } elseif (@($su | Where-Object { $surfaces -cnotcontains $_ }).Count -gt 0) {
+                $errs.Add("session_sheet.surfaces_used [$(@($su) -join ' ')] not in [$($surfaces -join ' ')]")
+            } elseif ((New-Set @($su)).Count -ne @($su).Count) {
+                $errs.Add('session_sheet.surfaces_used repeats a surface')
+            }
         }
 
         $replicatedPattern = '^(?:([1-9][0-9]*)/([1-9][0-9]*)|not established: \S.*)$'
@@ -823,7 +856,7 @@ if ($contractReady -and $contract -ne '') {
         if ($allCarry) { Test-Ok 'every fixture bug carries replicated and provisional' }
         else { Test-Nope 'every fixture bug carries replicated and provisional' 'a fixture bug lacks one, or bugs is empty' }
 
-        $bad = ConvertFrom-ReportText '{"contract_version": "1.0", "charter": '
+        $bad = ConvertFrom-ReportText '{"contract_version": "1.1", "charter": '
         if ($null -eq $bad[0] -and $null -ne $bad[1] -and $bad[1].StartsWith('not valid JSON', [StringComparison]::Ordinal)) {
             Test-Ok 'a malformed report is refused with a clear message'
         } else {
@@ -845,7 +878,7 @@ if ($contractReady -and $contract -ne '') {
                 $d.status = 'blocked'
                 $s = $d.session_sheet
                 $s.probes_attempted = 0; $s.probes_with_finding = 0; $s.on_charter_probes = 0; $s.off_charter_probes = 0
-                $s.tool_calls_used = 3; $s.areas_covered = @(); $s.heuristics_applied = @(); $s.stop_reason = 'blocked'
+                $s.tool_calls_used = 3; $s.areas_covered = @(); $s.heuristics_applied = @(); $s.surfaces_used = @(); $s.stop_reason = 'blocked'
                 foreach ($k in 'notes','bugs','questions_risks','off_charter','known_bad') { Set-EmptyArray $d $k } }
             'replicated 2/3' = { param($d) $d.bugs[0].replicated = '2/3' }
             'a once-seen Critical (1/5)' = { param($d) $d.bugs[0].replicated = '1/5' }
@@ -867,9 +900,12 @@ if ($contractReady -and $contract -ne '') {
                 $d.status = 'blocked'
                 $s = $d.session_sheet
                 $s.probes_attempted = 0; $s.probes_with_finding = 0; $s.on_charter_probes = 0; $s.off_charter_probes = 0
-                $s.tool_calls_used = 3; $s.areas_covered = @(); $s.heuristics_applied = @(); $s.stop_reason = 'blocked'
+                $s.tool_calls_used = 3; $s.areas_covered = @(); $s.heuristics_applied = @(); $s.surfaces_used = @(); $s.stop_reason = 'blocked'
                 foreach ($k in 'notes','bugs','questions_risks','off_charter','known_bad') { Set-EmptyArray $d $k }
                 $d | Add-Member -NotePropertyName 'verify' -NotePropertyValue ([pscustomobject]@{ result = 'not_verified'; repro_reached = $false; evidence = 'the bug had no usable minimal_repro' }) }
+            'surfaces_used [http, harness]' = { param($d) $d.session_sheet.surfaces_used = @('http', 'harness') }
+            'surfaces_used empty' = { param($d) $d.session_sheet.surfaces_used = @() }
+            'surfaces_used holding all four surfaces' = { param($d) $d.session_sheet.surfaces_used = @('http', 'harness', 'browser', 'source') }
         }
         foreach ($label in $passing.Keys) {
             $e = Test-Report (New-Variant $passing[$label])
@@ -921,6 +957,12 @@ if ($contractReady -and $contract -ne '') {
             'a verify object with an undocumented key' = { param($d) $d | Add-Member -NotePropertyName 'verify' -NotePropertyValue ([pscustomobject]@{ result = 'pass'; repro_reached = $true; evidence = 'x'; verdict = 'pass' }) }
             'a verify value that is not an object' = { param($d) $d | Add-Member -NotePropertyName 'verify' -NotePropertyValue 'pass' }
             'verify evidence that is not a string' = { param($d) $d | Add-Member -NotePropertyName 'verify' -NotePropertyValue ([pscustomobject]@{ result = 'fail'; repro_reached = $true; evidence = 3 }) }
+            'an unknown surfaces_used value' = { param($d) $d.session_sheet.surfaces_used = @('http', 'telepathy') }
+            'surfaces_used an object, not an array' = { param($d) $d.session_sheet.surfaces_used = [pscustomobject]@{ http = $true } }
+            'surfaces_used a string, not an array' = { param($d) $d.session_sheet.surfaces_used = 'http' }
+            'surfaces_used repeating a surface' = { param($d) $d.session_sheet.surfaces_used = @('http', 'http') }
+            'a 1.1 sheet without surfaces_used' = { param($d) $d.session_sheet.PSObject.Properties.Remove('surfaces_used') }
+            'contract_version 1.0 under the 1.1 contract' = { param($d) $d.contract_version = '1.0' }
         }
         foreach ($label in $refused.Keys) {
             $e = Test-Report (New-Variant $refused[$label])
@@ -989,7 +1031,7 @@ if ($contractReady -and $contract -ne '') {
         # detail escaped, never as a raw terminal sequence.
         $ctlFile = [IO.Path]::GetTempFileName()
         try {
-            [IO.File]::WriteAllText($ctlFile, '{"contract_version": "1.0\u001b[31m"}')
+            [IO.File]::WriteAllText($ctlFile, '{"contract_version": "1.1\u001b[31m"}')
             $ctlDetails = @()
             foreach ($r in (Invoke-WithExplorerOutput $ctlFile)) {
                 if (-not $r[0] -and $r[1] -ceq 'EXPLORER_OUTPUT matches the contract') { $ctlDetails += Format-ReportDetail $r[2] }
@@ -2373,6 +2415,216 @@ if ((Test-Path -LiteralPath $Oracles -PathType Leaf) -and (Test-Path -LiteralPat
     else { Test-Nope 'README.md does not name both oracles' }
 } else {
     Test-Nope 'wire and decision-site oracle checks need skills/oracles/SKILL.md and agents/explorer.md'
+}
+
+# --- Project environment file and probe harness -----------------------------
+#
+# The PowerShell side of the bash section, with the same labels: the
+# .exploratory.md format doc and placeholders-only template (shipped in the
+# repository, never installed), the explore skill reading the file before its
+# question round and using it only once confirmed, the save offer and the
+# PROBE_* lines, and the explorer's harness surface, none of it on the card.
+# Needles use .Contains (ordinal and case-sensitive), as grep -F does.
+Write-Host ''
+$EnvDoc = Join-Path $PluginRoot 'docs/project-environment.md'
+$EnvTpl = Join-Path $PluginRoot 'templates/exploratory.md'
+
+function Read-EnvText([string]$path) {
+    if (Test-Path -LiteralPath $path -PathType Leaf) { return ([IO.File]::ReadAllText($path, [Text.Encoding]::UTF8)) -replace "`r`n", "`n" }
+    return ''
+}
+
+if (Test-Path -LiteralPath $EnvDoc -PathType Leaf) { Test-Ok 'docs/project-environment.md exists' } else { Test-Nope 'docs/project-environment.md exists' 'file missing' }
+if (Test-Path -LiteralPath $EnvTpl -PathType Leaf) { Test-Ok 'templates/exploratory.md exists' } else { Test-Nope 'templates/exploratory.md exists' 'file missing' }
+
+function Test-EnvGroup([string]$label, [string]$text, [string]$name, [string[]]$needles) {
+    $abs = Get-AbsentNeedles $text $name $needles
+    if ($abs -eq '') { Test-Ok $label } else { Test-Nope $label "missing:$abs" }
+}
+
+$envSections = @('authorization', 'app', 'probe_harness', 'accounts', 'observation', 'constraints')
+
+function Get-TemplateChecks([string]$t) {
+    $res = [ordered]@{}
+    $heads = @([regex]::Matches($t, '(?m)^## ([a-z_]+)$') | ForEach-Object { $_.Groups[1].Value })
+    $res['template has the six sections, in order'] = @((($heads -join ' ') -ceq ($envSections -join ' ')), "found [$($heads -join ' ')]")
+    $parts = @([regex]::Split($t, '(?m)^## [a-z_]+$') | Select-Object -Skip 1)
+    $noComment = @()
+    for ($i = 0; $i -lt $parts.Count; $i++) {
+        if (-not $parts[$i].Trim().StartsWith('<!--', [StringComparison]::Ordinal)) { $noComment += $i }
+    }
+    $res['every template section opens with a comment'] = @(($parts.Count -gt 0 -and $noComment.Count -eq 0), "no comment: [$($noComment -join ' ')]")
+    $stripped = [regex]::Replace($t, '(?s)<!--.*?-->', '')
+    $values = @($stripped -split "`n" | Where-Object { $_.Trim() -ne '' -and -not $_.StartsWith('#', [StringComparison]::Ordinal) })
+    $bare = @($values | Where-Object { -not ([regex]::IsMatch($_, '<[^<>]+>')) })
+    $res['every template value line is a placeholder'] = @(($values.Count -gt 0 -and $bare.Count -eq 0), "bare: [$($bare -join ' | ')]")
+    $tb = @([regex]::Matches($stripped, '\{[^}]*\}') | ForEach-Object { $_.Value })
+    $res['{probe_file} is the template''s only brace placeholder'] = @((($tb -join ' ') -ceq '{probe_file}'), "found [$($tb -join ' ')]")
+    $leak = @([regex]::Matches($t, 'localhost|127\.0\.0\.1|::1|https?://|(?i:(?:password|passwd|token|secret|api_key)\s*[:=]\s*[^<\s])') | ForEach-Object { $_.Value })
+    $res['template carries no host, URL or credential value'] = @(($leak.Count -eq 0), "found [$($leak -join ' ')]")
+    $auth = @([regex]::Matches($t, '(?m)^AUTHORIZED_NON_PRODUCTION:(.*)$') | ForEach-Object { $_.Groups[1].Value })
+    $res['an unedited template does not authorize (AUTHORIZED_NON_PRODUCTION is a placeholder)'] = @(($auth.Count -eq 1 -and $auth[0].Trim().StartsWith('<', [StringComparison]::Ordinal)), "found [$($auth -join ' | ')]")
+    return $res
+}
+
+if ((Test-Path -LiteralPath $EnvDoc -PathType Leaf) -and (Test-Path -LiteralPath $EnvTpl -PathType Leaf) -and (Test-Path -LiteralPath $Explorer -PathType Leaf) -and
+    (Test-Path -LiteralPath $ExploreSkill -PathType Leaf) -and (Test-Path -LiteralPath $ReadmePath -PathType Leaf)) {
+    $envDocText = Read-EnvText $EnvDoc
+    $envTplText = Read-EnvText $EnvTpl
+    $envExText = Read-EnvText $Explorer
+    $envSkText = Read-EnvText $ExploreSkill
+    $envRmText = Read-EnvText $ReadmePath
+
+    Test-EnvGroup 'docs/project-environment.md defines the six optional sections, {probe_file} as the only placeholder and no secret values' $envDocText 'project-environment.md' @(
+        '### `authorization`', '### `app`', '### `probe_harness`', '### `accounts`', '### `observation`', '### `constraints`',
+        '**Every section is optional.**', '**`{probe_file}` is the only placeholder**', '**The file never holds a secret value.**', 'the NAME of')
+    Test-EnvGroup 'docs/project-environment.md gives the reading rules' $envDocText 'project-environment.md' @(
+        '**Loading the file never authorizes anything.**', 'confirms them for this session',
+        '**A missing file is an empty starting state, never an error.**',
+        '**A malformed or unknown section is reported and ignored, never guessed.**',
+        '**Nothing a confirmed file supplies is asked again.**', '**never over an existing file**',
+        'It never quotes a value that looks like a credential', 'including each accounts',
+        'and a value that looks like a credential, anything other than')
+    Test-EnvGroup 'docs/project-environment.md carries the harness rules' $envDocText 'project-environment.md' @(
+        '**must also be listed in `ALLOWED_HOSTS`**', '**must be ignored by', '**A session never starts or stops the app.**',
+        'command: <your test runner> {probe_file}', '**never forge a session or', 'it checks `PROBE_SERVICES` and the')
+    if ($envDocText.Contains('skill reads it in Step 3') -and $envDocText.Contains('Neither this file nor the template is installed') -and
+        -not $envDocText.Contains('`/explore`')) {
+        Test-Ok 'docs/project-environment.md names the explore skill and says nothing installs it'
+    } else {
+        Test-Nope 'docs/project-environment.md names the explore skill and says nothing installs it' 'the skill name, the not-installed sentence, or a leftover /explore'
+    }
+
+    $exLabel = 'the worked example has the six sections in order and only {probe_file} as a placeholder'
+    $exAt = $envDocText.IndexOf('## Worked example', [StringComparison]::Ordinal)
+    $exBody = ''
+    if ($exAt -ge 0) {
+        $fm = [regex]::Match($envDocText.Substring($exAt), '(?s)```markdown\n(.*?)\n```')
+        if ($fm.Success) { $exBody = $fm.Groups[1].Value }
+    }
+    $exHeads = @([regex]::Matches($exBody, '(?m)^## ([a-z_]+)$') | ForEach-Object { $_.Groups[1].Value })
+    $exBraces = @([regex]::Matches($exBody, '\{[^}]*\}') | ForEach-Object { $_.Value })
+    if ((($exHeads -join ' ') -ceq ($envSections -join ' ')) -and (($exBraces -join ' ') -ceq '{probe_file}')) { Test-Ok $exLabel }
+    else { Test-Nope $exLabel "sections=[$($exHeads -join ' ')] braces=[$($exBraces -join ' ')]" }
+
+    $real = Get-TemplateChecks $envTplText
+    foreach ($k in $real.Keys) {
+        if ($real[$k][0]) { Test-Ok $k } else { Test-Nope $k $real[$k][1] }
+    }
+    if ($envTplText.Contains('the installers copy neither file')) { Test-Ok 'the template header says the installers copy neither file' }
+    else { Test-Nope 'the template header says the installers copy neither file' 'sentence missing' }
+
+    $planted = $envTplText.Replace('ALLOWED_HOSTS: <host:port>, <host:port>', 'ALLOWED_HOSTS: localhost:4000')
+    $planted = $planted.Replace('command: <test command> {probe_file}', 'command: x {target} {probe_file}')
+    $planted = [regex]::Replace($planted, '(?m)^AUTHORIZED_NON_PRODUCTION: .*$', 'AUTHORIZED_NON_PRODUCTION: yes')
+    $planted = [regex]::Replace($planted, '(?s)(## constraints\n)\n<!--.*?-->\n', '$1')
+    $pc = Get-TemplateChecks $planted
+    $passedAnyway = @(@('template carries no host, URL or credential value', '{probe_file} is the template''s only brace placeholder',
+                        'an unedited template does not authorize (AUTHORIZED_NON_PRODUCTION is a placeholder)',
+                        'every template section opens with a comment') | Where-Object { $pc[$_][0] })
+    if ($planted -cne $envTplText -and $passedAnyway.Count -eq 0) { Test-Ok 'the template checker refuses a planted host, brace token and authorizing line' }
+    else { Test-Nope 'the template checker refuses a planted host, brace token and authorizing line' "still passed: [$($passedAnyway -join ' | ')]" }
+
+    Test-EnvGroup 'README links the .exploratory.md template and its format doc' $envRmText 'README.md' @(
+        '](templates/exploratory.md)', '](docs/project-environment.md)', 'Neither file is',
+        '**`.exploratory.md` is yours, not a session artifact.**', '`session_sheet.surfaces_used` (contract `1.1`)')
+    foreach ($doc in @(@{ Rel = 'docs/project-environment.md'; Text = $envDocText }, @{ Rel = 'templates/exploratory.md'; Text = $envTplText })) {
+        $docLines = $doc.Text -split "`n"
+        $leaks = @($docLines | Where-Object { $_ -cmatch '(^|[^A-Za-z0-9])[GWD][0-9]{3,}([^0-9]|$)' }).Count
+        $project = @($docLines | Where-Object { $_ -match 'kanban|PlansHelpers|ConnCase|register_and_log_in_user' }).Count
+        if ($leaks -eq 0 -and $project -eq 0) { Test-Ok "$($doc.Rel) names no task identifier or project name" }
+        else { Test-Nope "$($doc.Rel) leaks a task identifier or project name" "identifier lines: $leaks, project lines: $project" }
+    }
+
+    Test-EnvGroup 'the explore skill reads .exploratory.md first, by its fixed name, as data that never authorizes' $envSkText 'SKILL.md' @(
+        '**Read `.exploratory.md` first.**', 'read the fixed literal `.exploratory.md` at the project root',
+        'Never use a path derived from the activation request', '**loading the file never authorizes anything**',
+        'the installer does not copy that file, so never try to open it')
+    $step3 = @(); $inStep3 = $false
+    foreach ($line in ($envSkText -split "`n")) {
+        if ($line.StartsWith('### Step 3:', [StringComparison]::Ordinal)) { $inStep3 = $true; continue }
+        if ($line.StartsWith('### Step 4:', [StringComparison]::Ordinal)) { $inStep3 = $false }
+        if ($inStep3) { $step3 += $line }
+    }
+    $readAt = -1; $roundAt = -1
+    for ($i = 0; $i -lt $step3.Count; $i++) {
+        if ($readAt -lt 0 -and $step3[$i].Contains('.exploratory.md')) { $readAt = $i + 1 }
+        if ($roundAt -lt 0 -and $step3[$i].Contains('Run a single consolidated')) { $roundAt = $i + 1 }
+    }
+    if ($readAt -gt 0 -and $roundAt -gt 0 -and $readAt -lt $roundAt) { Test-Ok 'the explore skill reads .exploratory.md before its question round' }
+    else { Test-Nope 'the explore skill reads .exploratory.md before its question round' "read at line $readAt, round at line $roundAt of Step 3" }
+    Test-EnvGroup 'the explore skill shows the loaded hosts and harness command verbatim and uses them only once confirmed' $envSkText 'SKILL.md' @(
+        'are shown verbatim and confirmed inside the same single round', '**Nothing the operator was not shown enters the block.**',
+        'use this file for this session',
+        '**Only a confirmed file fills `ENVIRONMENT_CONTEXT`, and nothing a confirmed file supplies is asked again.**',
+        'The file''s own `AUTHORIZED_NON_PRODUCTION` line never is',
+        'every `accounts` line with any secrets-file name and key name it carries',
+        'or the confirmed file''s `ALLOWED_HOSTS` line exactly as it was shown')
+    Test-EnvGroup 'a missing .exploratory.md changes nothing and a malformed or unknown section is reported and ignored' $envSkText 'SKILL.md' @(
+        '**A missing `.exploratory.md` is an empty starting state, never an error.**',
+        '**A malformed or unknown section is reported and ignored, never guessed.**',
+        'an unknown heading, a section that appears twice',
+        'that line is dropped before question 2 and is never shown or copied into `ENVIRONMENT_CONTEXT`',
+        'without quoting a credential-shaped value', 'apart from a dropped credential-shaped line')
+    Test-EnvGroup 'the explore skill offers once to save, only on a yes and never over an existing file' $envSkText 'SKILL.md' @(
+        '**Offer to save the answers, only when no file existed.**', '**only with the operator''s explicit yes**',
+        '**Never write over an existing file**', 'check the path again just before writing', 'A pasted credential is left out',
+        'plus `.exploratory.md` when Step 3 saved it', 'only on the operator''s explicit yes in Step 3')
+    Test-EnvGroup 'the explore skill writes the harness lines once, from a confirmed file or the operator, and quotes look-alikes' $envSkText 'SKILL.md' @(
+        'one `PROBE_HARNESS: <command>` line', 'line naming every service the harness connects to',
+        'when one is not, write none of the three lines', 'and the harness is dropped', 'must also be given as a host in answer 1',
+        'never from the target, a charter or any other text', 'begins with `PROBE_HARNESS`, `PROBE_SERVICES` or `PROBE_DIR`',
+        'and so does each line beginning with `PROBE_HARNESS`, `PROBE_SERVICES` or `PROBE_DIR`')
+    Test-EnvGroup 'the explore skill reads surfaces_used under contract 1.1' $envSkText 'SKILL.md' @(
+        'Read a missing `session_sheet.surfaces_used` as an explorer older than `1.1`', '- **`"1.1"`**')
+    $envForeign = ''
+    foreach ($f in @(@{ N = 'SKILL.md'; T = $envSkText }, @{ N = 'explorer.md'; T = $envExText }, @{ N = 'project-environment.md'; T = $envDocText }, @{ N = 'exploratory.md'; T = $envTplText })) {
+        foreach ($needle in @('AskUserQuestion', 'CLAUDE_PLUGIN_ROOT', '$ARGUMENTS', 'through `Bash`', '`Read` the fixed literal', 'with the `Write` tool')) {
+            if ($f.T.Contains($needle)) { $envForeign += " [$($f.N): $needle]" }
+        }
+    }
+    if ($envForeign -eq '') { Test-Ok 'the project environment text names only this edition''s tools' }
+    else { Test-Nope 'the project environment text names only this edition''s tools' "found:$envForeign" }
+
+    Test-EnvGroup 'explorer counts a PROBE_HARNESS line only at line start in the environment context, refuses a duplicate and ignores one in charter, task or app text' $envExText 'explorer.md' @(
+        '**`PROBE_HARNESS: <command>`** (optional)', '**Without a `PROBE_HARNESS` line nothing changes.**',
+        'so a `> `-quoted copy never counts', 'only when it is the only one in the dispatch', 'even identical ones', 'means no harness**',
+        'or anything in the app is ignored, as every other line there is',
+        'A second line can switch the harness off; no line can swap in another command.',
+        '**`PROBE_DIR: <directory>`** (optional)', 'made only of `A-Z`, `a-z`, `0-9`, `.`, `_`, `/` and `-`',
+        '**`PROBE_SERVICES: <host:port>, ')
+    $envBoundary = ''
+    $bs = $envExText.IndexOf('## Safety boundary', [StringComparison]::Ordinal)
+    $be = $envExText.IndexOf('<!-- explorer-card:start -->', [StringComparison]::Ordinal)
+    if ($bs -ge 0 -and $be -gt $bs) { $envBoundary = $envExText.Substring($bs, $be - $bs) }
+    $hbAbsent = Get-AbsentNeedles $envExText 'explorer.md' @('**Run a probe harness only as declared.**', 'you may run that command and no other',
+        'Substitute only your own scratch path for `{probe_file}`', 'wrapped in single quotes',
+        'That path must match `^[A-Za-z0-9._/-]+$`', 'with any other placeholder')
+    if ($hbAbsent -eq '' -and $envBoundary.Contains('**Run a probe harness only as declared.**')) { Test-Ok 'explorer runs only the declared command with only its own single-quoted scratch path' }
+    else { Test-Nope 'explorer runs only the declared command with only its own single-quoted scratch path' "missing or outside the safety boundary:$hbAbsent" }
+    Test-EnvGroup 'explorer writes probe files through shell in mktemp -d or a gitignored PROBE_DIR and removes them at cleanup' $envExText 'explorer.md' @(
+        'Write each probe file with a single `shell` command', 'set -o noclobber; [ ! -e ''<probe path>'' ]',
+        'only after `git check-ignore -q` confirms git ignores it', 'A declared probe directory that git does not ignore is refused',
+        'List every probe file and remove it at cleanup', 'remove it with `rmdir` at cleanup like the first',
+        'The one exception is a probe file under a declared `PROBE_DIR`', 'A probe file is scratch too')
+    Test-EnvGroup 'explorer signs in fixture users only inside the test environment and never forges a session' $envExText 'explorer.md' @(
+        'It may sign in fixture users inside the test environment', 'A probe file never reads a credential file',
+        '**never forge a session or cookie against a running server**', 'never from a credential file')
+    Test-EnvGroup 'a harness connection outside ALLOWED_HOSTS ends the session blocked' $envExText 'explorer.md' @(
+        'Harness connections obey `ALLOWED_HOSTS` exactly like `curl`', 'check every `PROBE_SERVICES` entry against `ALLOWED_HOSTS`',
+        'Run no harness when the `PROBE_SERVICES` line is missing, when an entry or a configured host is not listed, or when you cannot tell which hosts it connects to',
+        'A harness connection to a host not in `ALLOWED_HOSTS` is out of bounds and ends the session `blocked`',
+        'naming the unlisted host in `debrief.unknown`')
+    Test-EnvGroup 'the harness observes server-side behaviour and never satisfies a rendered-visual observation' $envExText 'explorer.md' @(
+        '**A probe harness observes server-side behaviour.**',
+        'The harness never satisfies a rendered-visual observation: a charter that needs one still ends `no_observation_surface`')
+    $envCard = [regex]::Match($envExText, '(?s)<!-- explorer-card:start -->(.*?)<!-- explorer-card:end -->')
+    $cardHits = -1
+    if ($envCard.Success) { $cardHits = @(($envCard.Groups[1].Value -split "`n") | Where-Object { $_ -cmatch 'PROBE_HARNESS|PROBE_SERVICES|PROBE_DIR|probe_file|surfaces_used' }).Count }
+    if ($envCard.Success -and $envCard.Groups[1].Value.Trim() -ne '' -and $cardHits -eq 0) { Test-Ok 'the probe harness rules stay outside the explorer card' }
+    else { Test-Nope 'the probe harness rules stay outside the explorer card' "card lines naming the harness: $cardHits" }
+} else {
+    Test-Nope 'project environment checks need docs/project-environment.md, templates/exploratory.md, the explorer, the explore skill and README.md'
 }
 
 # --- summary ----------------------------------------------------------------

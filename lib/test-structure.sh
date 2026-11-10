@@ -40,6 +40,12 @@
 # sections (each with an example, the unknown-never-found and
 # agree-in-every-state rules, no new reach, curl -q -sS -i through shell, no
 # task-identifier or project-name leak) and their one-line card entries.
+# Then the .exploratory.md project environment file: its format doc and
+# placeholders-only template (never installed), the explore skill reading it
+# before its question round and using it only once confirmed, the save offer,
+# the PROBE_HARNESS / PROBE_SERVICES / PROBE_DIR lines, and the explorer's
+# harness surface kept off the card. The output contract is 1.1, with
+# session_sheet.surfaces_used.
 # Pure shell + python3 (for JSON) — no network, no jq.
 #
 # Exit code: 0 if every check passes; 1 if any check fails.
@@ -335,7 +341,7 @@ fi
 
 # --- Explorer output contract ----------------------------------------------
 #
-# Contract 1.0 for the explorer's findings JSON, checked against the agent
+# Contract 1.1 for the explorer's findings JSON, checked against the agent
 # file itself. A python3 checker reads the tables in agents/explorer.md (root
 # keys and element shapes, the bugs fields, the session_sheet fields, the
 # status-from-stop_reason table), the documented contract_version and the
@@ -442,7 +448,7 @@ say(set(derive.values()) == set(status_enum) and len(status_enum) == 3,
     "derived=%s enum=%s" % (sorted(set(derive.values())), status_enum))
 EXPECTED = {"charter_quiet": "completed", "risk_acceptable": "completed", "probe_budget_exhausted": "stopped_early",
             "tool_call_ceiling": "stopped_early", "blocked": "blocked", "no_observation_surface": "blocked"}
-say(derive == EXPECTED, "the status table maps each stop_reason exactly as contract 1.0 defines", "table=%s" % derive)
+say(derive == EXPECTED, "the status table maps each stop_reason exactly as contract 1.1 defines", "table=%s" % derive)
 # The mapping check must catch a stop_reason left without a row: drop one row in memory and re-check.
 dropped = re.findall(DERIVE_ROW, re.sub(r"^\| `tool_call_ceiling` \|.*\n", "", derive_text, flags=re.M), re.M)
 say(len(dropped) == len(pairs) - 1 and not maps_every_stop(dropped)[0],
@@ -454,7 +460,7 @@ say(bool(bug_table) and bug_table <= bug_keys and {"replicated", "provisional"} 
     "table=%s row=%s" % (sorted(bug_table), sorted(bug_keys)))
 say(all((elements.get(k) or (None,))[0] for k in ("questions_risks", "off_charter", "known_bad")),
     "questions_risks, off_charter and known_bad have defined element types", "a row has no {...} element shape")
-say(version == "1.0", "contract_version is documented as \"1.0\"", "found %r" % version)
+say(version == "1.1", "contract_version is documented as \"1.1\"", "found %r" % version)
 say((elements.get("verify") or (None, {}))[0] == ["result", "repro_reached", "evidence"]
     and elements["verify"][1].get("result") == ["pass", "fail", "not_verified"]
     and "verify" in root and not root["verify"]["required"]
@@ -462,14 +468,25 @@ say((elements.get("verify") or (None, {}))[0] == ["result", "repro_reached", "ev
     "the optional verify root key documents result (pass, fail or not_verified), repro_reached and evidence",
     "row=%s" % (elements.get("verify"),))
 say(severities == ["Critical", "High", "Moderate", "Minor"], "card severity words parsed", str(severities))
+# Contract 1.1 added session_sheet.surfaces_used, drawn from four named surfaces.
+sm_su = re.search(r"drawn only from (.*?):", sheet.get("surfaces_used", {}).get("notes", ""))
+surfaces = re.findall(r"`([a-z]+)`", sm_su.group(1)) if sm_su else []
+say(surfaces == ["http", "harness", "browser", "source"],
+    "session_sheet.surfaces_used is documented as an array drawn from http, harness, browser and source",
+    "found %s" % surfaces)
+say(sheet.get("surfaces_used", {}).get("type") == "array of strings",
+    "session_sheet.surfaces_used is typed array of strings", "found %r" % sheet.get("surfaces_used", {}).get("type"))
+say(("**Contract `%s` added this, and consumers treat it as optional:** `session_sheet.surfaces_used`" % version) in contract
+    and ("so an older consumer reads a `%s` report unchanged" % version) in contract,
+    "surfaces_used is declared optional to consumers in the 1.1 paragraph", "the contract 1.1 paragraph is missing")
 
-# The explore skill reads results by contract 1.0: its key list names every required root key.
+# The explore skill reads results by contract 1.1: its key list names every required root key.
 # verify is optional and belongs to verify mode, which the skill never sets, so it is not listed.
 cp = re.search(r"^\*\*Collect and parse\.\*\*.*$", skill, re.M)
 listed = set(re.findall(r"`([a-z_]+)`", cp.group(0).split("(`{explored", 1)[0])) if cp else set()
-say(cp is not None and "output contract `1.0`" in cp.group(0) and required_root == listed
+say(cp is not None and ("output contract `%s`" % version) in cp.group(0) and required_root == listed
     and "**Trust `stop_reason`, not `status`.**" in skill,
-    "explore skill reads explorer results by contract 1.0",
+    "explore skill reads explorer results by contract 1.1",
     "its Collect and parse list differs from the agent's required root keys: %s" % sorted(required_root ^ listed))
 # The skill repeats the derivation table, since it cannot read the agent
 # file; the copy must give the same mapping as the table.
@@ -516,6 +533,14 @@ def validate(doc):
             errs.append("on + off charter probes do not equal probes_attempted")
     else:
         errs.append("a session_sheet count is not an integer")
+    if "surfaces_used" in sheet and "surfaces_used" in ss:
+        su = ss["surfaces_used"]
+        if not isinstance(su, list) or not all(isinstance(x, str) for x in su):
+            errs.append("session_sheet.surfaces_used is not an array of strings")
+        elif [x for x in su if x not in surfaces]:
+            errs.append("session_sheet.surfaces_used %r not in %s" % (su, surfaces))
+        elif len(set(su)) != len(su):
+            errs.append("session_sheet.surfaces_used repeats a surface")
     for name in ("notes", "bugs", "questions_risks", "off_charter", "known_bad"):
         arr = doc.get(name)
         if not isinstance(arr, list):
@@ -592,7 +617,7 @@ say(not errs, "fixture matches every documented key, type, enum and derivation",
 say(len(fixture.get("bugs", [])) > 0 and all("replicated" in b and "provisional" in b for b in fixture["bugs"]),
     "every fixture bug carries replicated and provisional", "a fixture bug lacks one, or bugs is empty")
 
-bad_doc, bad_err = parse('{"contract_version": "1.0", "charter": ')
+bad_doc, bad_err = parse('{"contract_version": "1.1", "charter": ')
 say(bad_doc is None and bool(bad_err) and bad_err.startswith("not valid JSON"),
     "a malformed report is refused with a clear message", str(bad_err))
 
@@ -610,7 +635,7 @@ def blocked_first(d):
     d["status"] = "blocked"
     d["session_sheet"].update(probes_attempted=0, probes_with_finding=0, on_charter_probes=0,
                               off_charter_probes=0, tool_calls_used=3, areas_covered=[],
-                              heuristics_applied=[], stop_reason="blocked")
+                              heuristics_applied=[], surfaces_used=[], stop_reason="blocked")
     for k in ("notes", "bugs", "questions_risks", "off_charter", "known_bad"):
         d[k] = []
 def two_of_three(d):
@@ -636,6 +661,12 @@ def verify_ceiling_first(d):
 def verify_no_repro(d):
     blocked_first(d)
     d["verify"] = {"result": "not_verified", "repro_reached": False, "evidence": "the bug had no usable minimal_repro"}
+def harness_surface(d):
+    d["session_sheet"]["surfaces_used"] = ["http", "harness"]
+def no_surfaces(d):
+    d["session_sheet"]["surfaces_used"] = []
+def all_surfaces(d):
+    d["session_sheet"]["surfaces_used"] = ["http", "harness", "browser", "source"]
 
 for label, fn in (("zero bugs", zero_bugs), ("no bugs and an empty known_bad array", empty_arrays),
                   ("blocked before the first probe", blocked_first),
@@ -644,7 +675,9 @@ for label, fn in (("zero bugs", zero_bugs), ("no bugs and an empty known_bad arr
                   ("no_observation_surface after probing the observable part, findings kept", unobservable_part),
                   ("a verify pass", verify_pass), ("a verify fail with the bug filed", verify_fail),
                   ("a verify not_verified when the tool-call ceiling came before probe 1", verify_ceiling_first),
-                  ("a verify not_verified, blocked with no usable minimal_repro", verify_no_repro)):
+                  ("a verify not_verified, blocked with no usable minimal_repro", verify_no_repro),
+                  ("surfaces_used [http, harness]", harness_surface), ("surfaces_used empty", no_surfaces),
+                  ("surfaces_used holding all four surfaces", all_surfaces)):
     e = validate(variant(fn))
     say(not e, "variant passes: " + label, "; ".join(e))
 
@@ -721,6 +754,18 @@ def verify_not_object(d):
     d["verify"] = "pass"
 def verify_number_evidence(d):
     d["verify"] = {"result": "fail", "repro_reached": True, "evidence": 3}
+def bad_surface(d):
+    d["session_sheet"]["surfaces_used"] = ["http", "telepathy"]
+def surface_object(d):
+    d["session_sheet"]["surfaces_used"] = {"http": True}
+def surface_string(d):
+    d["session_sheet"]["surfaces_used"] = "http"
+def surface_twice(d):
+    d["session_sheet"]["surfaces_used"] = ["http", "http"]
+def no_surfaces_key(d):
+    del d["session_sheet"]["surfaces_used"]
+def old_version(d):
+    d["contract_version"] = "1.0"
 
 for label, fn in (("a bug without replicated", no_replicated), ("a bug without provisional", no_provisional),
                   ("provisional disagrees with stakeholder_impact", bad_provisional),
@@ -739,7 +784,12 @@ for label, fn in (("a bug without replicated", no_replicated), ("a bug without p
                   ("verify repro_reached that is not a boolean", verify_string_reached),
                   ("a verify object with an undocumented key", verify_extra_key),
                   ("a verify value that is not an object", verify_not_object),
-                  ("verify evidence that is not a string", verify_number_evidence)):
+                  ("verify evidence that is not a string", verify_number_evidence),
+                  ("an unknown surfaces_used value", bad_surface), ("surfaces_used an object, not an array", surface_object),
+                  ("surfaces_used a string, not an array", surface_string),
+                  ("surfaces_used repeating a surface", surface_twice),
+                  ("a 1.1 sheet without surfaces_used", no_surfaces_key),
+                  ("contract_version 1.0 under the 1.1 contract", old_version)):
     say(bool(validate(variant(fn))), "variant is refused: " + label, "the validator accepted it")
 
 for path in extra:
@@ -806,7 +856,7 @@ PY
   # A report value carrying a control character reaches the failure
   # detail escaped, never as a raw terminal sequence.
   CTL_FILE=$(mktemp "${TMPDIR:-/tmp}/explorer-output.XXXXXX")
-  printf '%s' '{"contract_version": "1.0\u001b[31m"}' > "$CTL_FILE"
+  printf '%s' '{"contract_version": "1.1\u001b[31m"}' > "$CTL_FILE"
   CTL_OUT=$(EXPLORER_OUTPUT="$CTL_FILE" run_contract_checker)
   rm -f "$CTL_FILE"
   ESC=$(printf '\033')
@@ -2184,6 +2234,227 @@ if [ -f "$ORACLES" ] && [ -f "$EXPLORER" ]; then
   fi
 else
   nope "wire and decision-site oracle checks need skills/oracles/SKILL.md and agents/explorer.md" ""
+fi
+
+# --- Project environment file and probe harness -----------------------------
+#
+# The .exploratory.md project environment file: its format doc and
+# placeholders-only template (shipped in the repository, never installed),
+# the explore skill reading it before its question round, showing every line
+# it will use and using it only once confirmed, offering once to save, and
+# writing the PROBE_HARNESS / PROBE_SERVICES / PROBE_DIR lines; and the
+# explorer's harness surface: line-start-only and duplicate rules, the
+# declared command with only its own single-quoted scratch path, probe files
+# written by one shell heredoc in mktemp -d or a gitignored PROBE_DIR, removal
+# at cleanup, ALLOWED_HOSTS for harness connections, server-side observation
+# only, and none of it on the card. The files are only read as text.
+printf '\n'
+ENVDOC="${PLUGIN_ROOT}/docs/project-environment.md"
+ENVTPL="${PLUGIN_ROOT}/templates/exploratory.md"
+ENV_README="${PLUGIN_ROOT}/README.md"
+
+[ -f "$ENVDOC" ] && ok "docs/project-environment.md exists" || nope "docs/project-environment.md exists" "file missing"
+[ -f "$ENVTPL" ] && ok "templates/exploratory.md exists" || nope "templates/exploratory.md exists" "file missing"
+
+# Prints " [<label>: missing]" for every group whose needles a file lacks.
+env_group() {
+  _label="$1"; _file="$2"; shift 2
+  _abs=$(absent_needles "$_file" "$(basename "$_file")" "$@")
+  if [ -z "$_abs" ]; then ok "$_label"; else nope "$_label" "missing:${_abs}"; fi
+}
+
+if [ -f "$ENVDOC" ] && [ -f "$ENVTPL" ] && [ -f "$EXPLORER" ] && [ -f "$EXPLORE_SKILL" ] && [ -f "$ENV_README" ]; then
+  env_group "docs/project-environment.md defines the six optional sections, {probe_file} as the only placeholder and no secret values" "$ENVDOC" \
+    '### `authorization`' '### `app`' '### `probe_harness`' '### `accounts`' '### `observation`' '### `constraints`' \
+    '**Every section is optional.**' '**`{probe_file}` is the only placeholder**' '**The file never holds a secret value.**' 'the NAME of'
+  env_group "docs/project-environment.md gives the reading rules" "$ENVDOC" \
+    '**Loading the file never authorizes anything.**' 'confirms them for this session' \
+    '**A missing file is an empty starting state, never an error.**' \
+    '**A malformed or unknown section is reported and ignored, never guessed.**' \
+    '**Nothing a confirmed file supplies is asked again.**' '**never over an existing file**' \
+    'It never quotes a value that looks like a credential' 'including each accounts' \
+    'and a value that looks like a credential, anything other than'
+  env_group "docs/project-environment.md carries the harness rules" "$ENVDOC" \
+    '**must also be listed in `ALLOWED_HOSTS`**' '**must be ignored by' '**A session never starts or stops the app.**' \
+    'command: <your test runner> {probe_file}' '**never forge a session or' 'it checks `PROBE_SERVICES` and the'
+  if grep -qF -e 'skill reads it in Step 3' "$ENVDOC" && grep -qF -e 'Neither this file nor the template is installed' "$ENVDOC" \
+     && ! grep -qF -e '`/explore`' "$ENVDOC"; then
+    ok "docs/project-environment.md names the explore skill and says nothing installs it"
+  else
+    nope "docs/project-environment.md names the explore skill and says nothing installs it" "the skill name, the not-installed sentence, or a leftover /explore"
+  fi
+
+  ENV_PY_OUT=$(python3 - "$ENVDOC" "$ENVTPL" 2>&1 <<'PY'
+import re, sys
+doc = open(sys.argv[1], encoding="utf-8-sig").read().replace("\r\n", "\n")
+tpl = open(sys.argv[2], encoding="utf-8-sig").read().replace("\r\n", "\n")
+SECTIONS = ["authorization", "app", "probe_harness", "accounts", "observation", "constraints"]
+
+def say(ok, label, detail=""):
+    print(("PASS\t" if ok else "FAIL\t") + label + ("" if ok else "\t" + str(detail).replace("\t", " ").replace("\n", " ")))
+
+ex = doc.split("## Worked example", 1)[1] if "## Worked example" in doc else ""
+fence = re.search(r"```markdown\n(.*?)\n```", ex, re.S)
+body = fence.group(1) if fence else ""
+heads = re.findall(r"^## ([a-z_]+)$", body, re.M)
+braces = re.findall(r"\{[^}]*\}", body)
+say(heads == SECTIONS and braces == ["{probe_file}"],
+    "the worked example has the six sections in order and only {probe_file} as a placeholder",
+    "sections=%s braces=%s" % (heads, braces))
+
+def template_checks(t):
+    res = {}
+    heads = re.findall(r"^## ([a-z_]+)$", t, re.M)
+    res["template has the six sections, in order"] = (heads == SECTIONS, "found %s" % heads)
+    parts = re.split(r"^## [a-z_]+$", t, flags=re.M)[1:]
+    no_comment = [SECTIONS[i] if i < len(SECTIONS) else str(i) for i, p in enumerate(parts) if not p.strip().startswith("<!--")]
+    res["every template section opens with a comment"] = (bool(parts) and not no_comment, "no comment: %s" % no_comment)
+    stripped = re.sub(r"<!--.*?-->", "", t, flags=re.S)
+    values = [l for l in stripped.splitlines() if l.strip() and not l.startswith("#")]
+    bare = [l for l in values if not re.search(r"<[^<>]+>", l)]
+    res["every template value line is a placeholder"] = (bool(values) and not bare, "bare: %s" % bare)
+    tb = re.findall(r"\{[^}]*\}", stripped)
+    res["{probe_file} is the template's only brace placeholder"] = (tb == ["{probe_file}"], "found %s" % tb)
+    leak = re.findall(r"localhost|127\.0\.0\.1|::1|https?://|(?i:(?:password|passwd|token|secret|api_key)\s*[:=]\s*[^<\s])", t)
+    res["template carries no host, URL or credential value"] = (not leak, "found %s" % leak)
+    auth = re.findall(r"^AUTHORIZED_NON_PRODUCTION:(.*)$", t, re.M)
+    res["an unedited template does not authorize (AUTHORIZED_NON_PRODUCTION is a placeholder)"] = (
+        len(auth) == 1 and auth[0].strip().startswith("<"), "found %s" % auth)
+    return res
+
+real = template_checks(tpl)
+for label, (ok, detail) in real.items():
+    say(ok, label, detail)
+say("the installers copy neither file" in tpl, "the template header says the installers copy neither file", "sentence missing")
+
+planted = tpl.replace("ALLOWED_HOSTS: <host:port>, <host:port>", "ALLOWED_HOSTS: localhost:4000")
+planted = planted.replace("command: <test command> {probe_file}", "command: x {target} {probe_file}")
+planted = re.sub(r"^AUTHORIZED_NON_PRODUCTION: .*$", "AUTHORIZED_NON_PRODUCTION: yes", planted, flags=re.M)
+planted = re.sub(r"(## constraints\n)\n<!--.*?-->\n", r"\1", planted, flags=re.S)
+pc = template_checks(planted)
+want_fail = ["template carries no host, URL or credential value", "{probe_file} is the template's only brace placeholder",
+             "an unedited template does not authorize (AUTHORIZED_NON_PRODUCTION is a placeholder)",
+             "every template section opens with a comment"]
+passed_anyway = [l for l in want_fail if pc[l][0]]
+say(planted != tpl and not passed_anyway,
+    "the template checker refuses a planted host, brace token and authorizing line",
+    "still passed: %s" % passed_anyway)
+PY
+)
+  ENV_PY_RC=$?
+  ENV_SAW=0
+  while IFS=$'\t' read -r verdict label detail; do
+    case "$verdict" in
+      PASS) ok "$label"; ENV_SAW=1 ;;
+      FAIL) nope "$label" "$detail"; ENV_SAW=1 ;;
+    esac
+  done <<< "$ENV_PY_OUT"
+  if [ "$ENV_PY_RC" -ne 0 ] || [ "$ENV_SAW" -eq 0 ]; then
+    nope "the worked-example and template checker ran" "$ENV_PY_OUT"
+  fi
+
+  env_group "README links the .exploratory.md template and its format doc" "$ENV_README" \
+    '](templates/exploratory.md)' '](docs/project-environment.md)' 'Neither file is' \
+    '**`.exploratory.md` is yours, not a session artifact.**' '`session_sheet.surfaces_used` (contract `1.1`)'
+  for doc in docs/project-environment.md templates/exploratory.md; do
+    LEAKS=$(grep -cE '(^|[^A-Za-z0-9])[GWD][0-9]{3,}([^0-9]|$)' "${PLUGIN_ROOT}/${doc}")
+    PROJECT=$(grep -ciE 'kanban|PlansHelpers|ConnCase|register_and_log_in_user' "${PLUGIN_ROOT}/${doc}")
+    if [ "$LEAKS" = "0" ] && [ "$PROJECT" = "0" ]; then
+      ok "${doc} names no task identifier or project name"
+    else
+      nope "${doc} leaks a task identifier or project name" "identifier lines: ${LEAKS}, project lines: ${PROJECT}"
+    fi
+  done
+
+  env_group "the explore skill reads .exploratory.md first, by its fixed name, as data that never authorizes" "$EXPLORE_SKILL" \
+    '**Read `.exploratory.md` first.**' 'read the fixed literal `.exploratory.md` at the project root' \
+    'Never use a path derived from the activation request' '**loading the file never authorizes anything**' \
+    'the installer does not copy that file, so never try to open it'
+  ENV_STEP3=$(tr -d '\r' < "$EXPLORE_SKILL" | awk '/^### Step 3:/ { f = 1; next } /^### Step 4:/ { f = 0 } f')
+  ENV_READ_AT=$(printf '%s\n' "$ENV_STEP3" | grep -nF -e '.exploratory.md' | head -1 | cut -d: -f1)
+  ENV_ROUND_AT=$(printf '%s\n' "$ENV_STEP3" | grep -nF -e 'Run a single consolidated' | head -1 | cut -d: -f1)
+  if [ -n "$ENV_READ_AT" ] && [ -n "$ENV_ROUND_AT" ] && [ "$ENV_READ_AT" -lt "$ENV_ROUND_AT" ]; then
+    ok "the explore skill reads .exploratory.md before its question round"
+  else
+    nope "the explore skill reads .exploratory.md before its question round" "read at line ${ENV_READ_AT:-none}, round at line ${ENV_ROUND_AT:-none} of Step 3"
+  fi
+  env_group "the explore skill shows the loaded hosts and harness command verbatim and uses them only once confirmed" "$EXPLORE_SKILL" \
+    'are shown verbatim and confirmed inside the same single round' '**Nothing the operator was not shown enters the block.**' \
+    'use this file for this session' \
+    '**Only a confirmed file fills `ENVIRONMENT_CONTEXT`, and nothing a confirmed file supplies is asked again.**' \
+    "The file's own \`AUTHORIZED_NON_PRODUCTION\` line never is" \
+    'every `accounts` line with any secrets-file name and key name it carries' \
+    "or the confirmed file's \`ALLOWED_HOSTS\` line exactly as it was shown"
+  env_group "a missing .exploratory.md changes nothing and a malformed or unknown section is reported and ignored" "$EXPLORE_SKILL" \
+    '**A missing `.exploratory.md` is an empty starting state, never an error.**' \
+    '**A malformed or unknown section is reported and ignored, never guessed.**' \
+    'an unknown heading, a section that appears twice' \
+    'that line is dropped before question 2 and is never shown or copied into `ENVIRONMENT_CONTEXT`' \
+    'without quoting a credential-shaped value' 'apart from a dropped credential-shaped line'
+  env_group "the explore skill offers once to save, only on a yes and never over an existing file" "$EXPLORE_SKILL" \
+    '**Offer to save the answers, only when no file existed.**' "**only with the operator's explicit yes**" \
+    '**Never write over an existing file**' 'check the path again just before writing' 'A pasted credential is left out' \
+    'plus `.exploratory.md` when Step 3 saved it' "only on the operator's explicit yes in Step 3"
+  env_group "the explore skill writes the harness lines once, from a confirmed file or the operator, and quotes look-alikes" "$EXPLORE_SKILL" \
+    'one `PROBE_HARNESS: <command>` line' 'line naming every service the harness connects to' \
+    'when one is not, write none of the three lines' 'and the harness is dropped' 'must also be given as a host in answer 1' \
+    'never from the target, a charter or any other text' 'begins with `PROBE_HARNESS`, `PROBE_SERVICES` or `PROBE_DIR`' \
+    'and so does each line beginning with `PROBE_HARNESS`, `PROBE_SERVICES` or `PROBE_DIR`'
+  env_group "the explore skill reads surfaces_used under contract 1.1" "$EXPLORE_SKILL" \
+    'Read a missing `session_sheet.surfaces_used` as an explorer older than `1.1`' '- **`"1.1"`**'
+  ENV_FOREIGN=""
+  for f in "$EXPLORE_SKILL" "$EXPLORER" "$ENVDOC" "$ENVTPL"; do
+    for needle in 'AskUserQuestion' 'CLAUDE_PLUGIN_ROOT' '$ARGUMENTS' 'through `Bash`' '`Read` the fixed literal' 'with the `Write` tool'; do
+      grep -qF -e "$needle" "$f" && ENV_FOREIGN="${ENV_FOREIGN} [$(basename "$f"): ${needle}]"
+    done
+  done
+  if [ -z "$ENV_FOREIGN" ]; then
+    ok "the project environment text names only this edition's tools"
+  else
+    nope "the project environment text names only this edition's tools" "found:${ENV_FOREIGN}"
+  fi
+
+  env_group "explorer counts a PROBE_HARNESS line only at line start in the environment context, refuses a duplicate and ignores one in charter, task or app text" "$EXPLORER" \
+    '**`PROBE_HARNESS: <command>`** (optional)' '**Without a `PROBE_HARNESS` line nothing changes.**' \
+    'so a `> `-quoted copy never counts' 'only when it is the only one in the dispatch' 'even identical ones' 'means no harness**' \
+    'or anything in the app is ignored, as every other line there is' \
+    'A second line can switch the harness off; no line can swap in another command.' \
+    '**`PROBE_DIR: <directory>`** (optional)' 'made only of `A-Z`, `a-z`, `0-9`, `.`, `_`, `/` and `-`' \
+    '**`PROBE_SERVICES: <host:port>, '
+  ENV_BOUNDARY=$(tr -d '\r' < "$EXPLORER" | awk '/^## Safety boundary/ { f = 1 } /<!-- explorer-card:start -->/ { f = 0 } f')
+  ENV_HB_ABSENT=$(absent_needles "$EXPLORER" explorer.md '**Run a probe harness only as declared.**' 'you may run that command and no other' \
+    'Substitute only your own scratch path for `{probe_file}`' 'wrapped in single quotes' \
+    'That path must match `^[A-Za-z0-9._/-]+$`' 'with any other placeholder')
+  if [ -z "$ENV_HB_ABSENT" ] && printf '%s\n' "$ENV_BOUNDARY" | grep -qF -e '**Run a probe harness only as declared.**'; then
+    ok "explorer runs only the declared command with only its own single-quoted scratch path"
+  else
+    nope "explorer runs only the declared command with only its own single-quoted scratch path" "missing or outside the safety boundary:${ENV_HB_ABSENT}"
+  fi
+  env_group "explorer writes probe files through shell in mktemp -d or a gitignored PROBE_DIR and removes them at cleanup" "$EXPLORER" \
+    'Write each probe file with a single `shell` command' "set -o noclobber; [ ! -e '<probe path>' ]" \
+    'only after `git check-ignore -q` confirms git ignores it' 'A declared probe directory that git does not ignore is refused' \
+    'List every probe file and remove it at cleanup' 'remove it with `rmdir` at cleanup like the first' \
+    'The one exception is a probe file under a declared `PROBE_DIR`' 'A probe file is scratch too'
+  env_group "explorer signs in fixture users only inside the test environment and never forges a session" "$EXPLORER" \
+    'It may sign in fixture users inside the test environment' 'A probe file never reads a credential file' \
+    '**never forge a session or cookie against a running server**' 'never from a credential file'
+  env_group "a harness connection outside ALLOWED_HOSTS ends the session blocked" "$EXPLORER" \
+    'Harness connections obey `ALLOWED_HOSTS` exactly like `curl`' 'check every `PROBE_SERVICES` entry against `ALLOWED_HOSTS`' \
+    'Run no harness when the `PROBE_SERVICES` line is missing, when an entry or a configured host is not listed, or when you cannot tell which hosts it connects to' \
+    'A harness connection to a host not in `ALLOWED_HOSTS` is out of bounds and ends the session `blocked`' \
+    'naming the unlisted host in `debrief.unknown`'
+  env_group "the harness observes server-side behaviour and never satisfies a rendered-visual observation" "$EXPLORER" \
+    '**A probe harness observes server-side behaviour.**' \
+    'The harness never satisfies a rendered-visual observation: a charter that needs one still ends `no_observation_surface`'
+  ENV_CARD=$(tr -d '\r' < "$EXPLORER" | awk '/explorer-card:start/{f=1;next} /explorer-card:end/{f=0} f')
+  ENV_CARD_HITS=$(printf '%s\n' "$ENV_CARD" | grep -cE 'PROBE_HARNESS|PROBE_SERVICES|PROBE_DIR|probe_file|surfaces_used')
+  if [ -n "$ENV_CARD" ] && [ "$ENV_CARD_HITS" = "0" ]; then
+    ok "the probe harness rules stay outside the explorer card"
+  else
+    nope "the probe harness rules stay outside the explorer card" "card lines naming the harness: ${ENV_CARD_HITS}"
+  fi
+else
+  nope "project environment checks need docs/project-environment.md, templates/exploratory.md, the explorer, the explore skill and README.md" ""
 fi
 
 # --- summary ----------------------------------------------------------------

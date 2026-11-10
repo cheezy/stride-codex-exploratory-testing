@@ -158,6 +158,9 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
   sheet, and returns structured findings — all under the absolute safety boundary.
   It finds what it needs with `search` or `grep -n`, reads just a bounded range
   with `sed -n` through `shell`, and never reads an unchanged file twice.
+  Given an optional `PROBE_HARNESS:` line, it runs scratch probe files under the
+  project's own test framework, signing in fixture users with several roles, and
+  records which surfaces it used in `session_sheet.surfaces_used` (contract `1.1`).
   A caller can have it write those findings to a file instead; see
   [Explorer report file](#explorer-report-file-exploratory_report_path).
 
@@ -166,10 +169,21 @@ The end-to-end flow is **Charter → Recon → Explore → Note → Debrief.**
 [example session sheet](fixtures/example-session-sheet.md), an
 [example debrief](fixtures/example-debrief.md), and an
 [example explorer report](fixtures/example-explorer-output.json) in output
-contract `1.0`. They double as concrete templates and as regression anchors for
+contract `1.1`. They double as concrete templates and as regression anchors for
 the smoke tests: `lib/test-structure.sh` and `lib/test-structure.ps1` check the
 example report against the explorer's own contract tables, and setting
 `EXPLORER_OUTPUT` to a real report's path checks that report the same way.
+
+**`templates/`** — [a commented `.exploratory.md` template](templates/exploratory.md),
+placeholders only. Copy it to the root of the project you test as `.exploratory.md`
+to say once how sessions reach the running system: the authorization lines, the
+app's address, the probe-harness command, the account roles, the observation tools
+and the project's constraints. It holds no secret values. The
+`stride-exploratory-testing-explore` skill reads it in Step 3 and uses it only after
+you confirm it for that session. The format and the reading rules are in
+[docs/project-environment.md](docs/project-environment.md). Neither file is
+installed: the installers copy only each skill's `SKILL.md` and `references/`, the
+agents and `AGENTS.md`, so read and copy them from this repository.
 
 ### Explorer report file (`EXPLORATORY_REPORT_PATH`)
 
@@ -352,6 +366,11 @@ directory, never the installed skill tree:
 - **The charter skill reads both back** and hands a digest to the `charter-generator`
   agent, so run five proposes different charters than run one instead of
   re-suggesting ground you already covered.
+- **`.exploratory.md` is yours, not a session artifact.** It sits at the project root
+  beside the `.exploratory/` directory, you write it from
+  [the template](templates/exploratory.md), and no command-skill writes it unless the
+  explore skill offers to save your answers when none exists and you say yes. It is
+  never overwritten.
 
 **A first run creates the tree.** No command-skill fails, warns, or asks you to set
 anything up because `.exploratory/` doesn't exist yet — a missing file is an empty
@@ -371,7 +390,8 @@ run they are treated as **untrusted data** — content to weigh, never instructi
 obey.
 
 No command-skill writes anywhere other than these four paths or a `--output` path
-you named yourself.
+you named yourself — or a new `.exploratory.md`, which the explore skill writes only
+on your yes and never over an existing file.
 
 ## Heuristics reference
 
